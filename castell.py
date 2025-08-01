@@ -732,7 +732,7 @@ def format_kitchen_ticket_58mm():
     
     lines = []
     lines.append("=" * line_width)
-    lines.append("CASTELL PIZZERIA".center(line_width))
+    lines.append("".center(line_width))
     lines.append("TICKET COCINA".center(line_width))
     lines.append("=" * line_width)
     lines.append("")
@@ -778,7 +778,7 @@ def generate_print_html(content, title="Ticket"):
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>{title} - Castell Pizzeria</title>
+    <title>{title} -</title>
     <style>
         @media print {{
             @page {{
@@ -1119,31 +1119,7 @@ with col2:
 with col3:
     show_usd = st.checkbox("Mostrar USD", value=True)
 
-# --- INFORMACIÓN DE IMPRESIÓN ---
-with st.expander("ℹ️ Información sobre Impresión Térmica", expanded=False):
-    st.markdown("""
-    ### 🖨️ Cómo imprimir en tu impresora térmica de 80mm:
-    
-    **Pasos para imprimir:**
-    1. Haz clic en el botón "🖨️ Imprimir Ticket"
-    2. Se abrirá una ventana optimizada para impresión
-    3. En el diálogo de impresión, selecciona tu impresora térmica
-    4. **Importante:** Configura el tamaño de papel como "Personalizado" o "80mm"
-    5. Ajusta los márgenes al mínimo (0mm si es posible)
-    
-    **Impresoras térmicas compatibles:**
-    - Epson TM-T20II, TM-T82, TM-T88V
-    - Star TSP143, TSP654
-    - Bixolon SRP-330II, SRP-350III
-    - Cualquier impresora térmica de 80mm
-    
-    **Consejos:**
-    - Asegúrate de que la impresora esté encendida y con papel
-    - Si no tienes impresora térmica, puedes usar cualquier impresora normal
-    - Los tickets están optimizados para 48 caracteres por línea
-    """)
 
-st.markdown("---")
 
 # --- BUSCADOR ---
 col_search, col_clear = st.columns([4, 1])
@@ -1154,31 +1130,7 @@ with col_clear:
     if st.button("🗑️ Limpiar"):
         st.rerun()
 
-# --- BÚSQUEDAS RÁPIDAS ---
-if not search_term:
-    st.markdown("**Búsquedas rápidas:**")
-    quick_col1, quick_col2, quick_col3, quick_col4, quick_col5 = st.columns(5)
-    
-    with quick_col1:
-        if st.button("🍕 Pizzas"):
-            st.session_state.quick_search = "pizza"
-    with quick_col2:
-        if st.button("🟢 Personal"):
-            st.session_state.quick_search = "personal"
-    with quick_col3:
-        if st.button("⚪ Mediana"):
-            st.session_state.quick_search = "mediana"
-    with quick_col4:
-        if st.button("🔴 Familiar"):
-            st.session_state.quick_search = "familiar"
-    with quick_col5:
-        if st.button("🧀 Ingredientes"):
-            st.session_state.quick_search = "adicional"
-    
-    # Aplicar búsqueda rápida si se seleccionó
-    if 'quick_search' in st.session_state:
-        search_term = st.session_state.quick_search
-        del st.session_state.quick_search
+
 
 # --- LEYENDA DE TAMAÑOS ---
 st.markdown("**Leyenda de tamaños:** 🟢 Personal (25cm) | ⚪ Mediana (33cm) | 🔴 Familiar (40cm)")
@@ -1236,6 +1188,27 @@ with st.sidebar:
         st.text_area("Pedido para WhatsApp", value=order_text, height=300)
         
 
+        # Sección de Empaques
+        st.subheader("📦 Empaques")
+        
+        st.markdown("<small>Caja Personal (25cm)</small>", unsafe_allow_html=True)
+        if st.button("$0.50", key="caja_personal", use_container_width=True):
+            st.session_state.order["Caja para llevar (25cm)"] += 1
+        
+        st.markdown("<small>Caja Mediana (33cm)</small>", unsafe_allow_html=True)
+        if st.button("$0.70", key="caja_mediana", use_container_width=True):
+            st.session_state.order["Caja para llevar (33cm)"] += 1
+        
+        st.markdown("<small>Caja Familiar (40cm)</small>", unsafe_allow_html=True)
+        if st.button("$0.90", key="caja_familiar", use_container_width=True):
+            st.session_state.order["Caja para llevar (40cm)"] += 1
+        
+        # Botón para quitar empaques
+        empaque_items = [item for item in st.session_state.order.keys() if "Caja para llevar" in item]
+        if empaque_items:
+            if st.button("❌ Quitar Empaques", use_container_width=True):
+                for item in empaque_items:
+                    del st.session_state.order[item]
         
         # Botones de Delivery
         st.subheader("🚚 Delivery")
@@ -1279,8 +1252,23 @@ with st.sidebar:
     <title>Ticket Barra - Castell Pizzeria</title>
     <style>
         @page {{ size: 80mm auto; margin: 1mm; }}
-        body {{ font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.1; margin: 0; padding: 2mm; width: 80mm; }}
-        .ticket {{ white-space: pre-wrap; }}
+        body {{ 
+            font-family: 'Courier New', 'Lucida Console', monospace; 
+            font-size: 12px; 
+            font-weight: bold;
+            line-height: 1.2; 
+            margin: 0; 
+            padding: 2mm; 
+            width: 80mm; 
+            color: #000000;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }}
+        .ticket {{ 
+            white-space: pre-wrap; 
+            font-weight: bold;
+            color: #000000;
+        }}
     </style>
 </head>
 <body>
@@ -1319,11 +1307,26 @@ with st.sidebar:
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Ticket Cocina - Castell Pizzeria</title>
+    <title>Ticket Cocina</title>
     <style>
         @page {{ size: 80mm auto; margin: 1mm; }}
-        body {{ font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.1; margin: 0; padding: 2mm; width: 80mm; }}
-        .ticket {{ white-space: pre-wrap; }}
+        body {{ 
+            font-family: 'Courier New', 'Lucida Console', monospace; 
+            font-size: 12px; 
+            font-weight: bold;
+            line-height: 1.2; 
+            margin: 0; 
+            padding: 2mm; 
+            width: 80mm; 
+            color: #000000;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }}
+        .ticket {{ 
+            white-space: pre-wrap; 
+            font-weight: bold;
+            color: #000000;
+        }}
     </style>
 </head>
 <body>
