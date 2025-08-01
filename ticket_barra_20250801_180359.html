@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ticket Barra - Castell Pizzeria</title>
+    <style>
+        @page { size: 58mm auto; margin: 1mm; }
+        body { font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.1; margin: 0; padding: 2mm; }
+        .ticket { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="ticket">================================
+         CASTELL PIZZAS         
+          TICKET BARRA          
+================================
+
+CLIENTE: angelo 
+TIPO: Para llevar (PICKUP)
+
+--------------------------------
+PEDIDO
+--------------------------------
+1x Di Abruzzo (Familiar 40cm)
+                          $16.00
+                        Bs.2,007
+
+--------------------------------
+SUBTOTAL:
+                          $16.00
+                        Bs.2,007
+
+--------------------------------
+Tasa BCV: Bs.125.42
+
+================================
+GRACIAS POR SU COMPRA
+================================</div>
+    <script>
+        window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 2000);
+        };
+    </script>
+</body>
+</html>

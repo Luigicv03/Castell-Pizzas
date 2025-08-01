@@ -1,6 +1,17 @@
 import streamlit as st
 from collections import Counter
 import requests
+import os
+import platform
+from datetime import datetime
+
+# Importaciones para impresión térmica
+try:
+    from escpos.printer import Usb, Serial, Network, File
+    from escpos.exceptions import USBNotFoundError, SerialException
+    ESCPOS_AVAILABLE = True
+except ImportError:
+    ESCPOS_AVAILABLE = False
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -109,6 +120,10 @@ if 'show_4estaciones_modal' not in st.session_state:
     st.session_state.show_4estaciones_modal = False
 if 'selected_estaciones_ingredients' not in st.session_state:
     st.session_state.selected_estaciones_ingredients = []
+if 'customer_name' not in st.session_state:
+    st.session_state.customer_name = ""
+if 'order_type' not in st.session_state:
+    st.session_state.order_type = "Para comer aquí"
 
 
 # --- FUNCIONES PARA API DEL DÓLAR ---
@@ -568,6 +583,18 @@ def format_order_text():
     all_items = {k: v for category in MENU.values() for k, v in category.items()}
     sorted_order = sorted(st.session_state.order.items())
     
+    # Agregar información del cliente al inicio
+    order_lines.append("=" * 50)
+    order_lines.append("CASTELL PIZZAS")
+    order_lines.append("=" * 50)
+    order_lines.append("")
+    order_lines.append(f"CLIENTE: {st.session_state.customer_name or 'Sin nombre'}")
+    order_lines.append(f"TIPO: {st.session_state.order_type}")
+    order_lines.append("")
+    order_lines.append("-" * 50)
+    order_lines.append("PEDIDO:")
+    order_lines.append("-" * 50)
+    
     # Obtener tasa del dólar
     if 'dollar_rate' not in st.session_state:
         st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
@@ -599,11 +626,466 @@ def format_order_text():
             order_lines.append(formatted_line)
     
     subtotal_bs = subtotal_usd * st.session_state.dollar_rate
-    subtotal_line = f"\n{'SUBTOTAL'.ljust(45, '.')} ${subtotal_usd:.2f} (Bs. {subtotal_bs:,.2f})".rjust(20)
+    order_lines.append("")
+    order_lines.append("-" * 50)
+    subtotal_line = f"{'SUBTOTAL'.ljust(25)} ${subtotal_usd:.2f} (Bs. {subtotal_bs:,.2f})"
     order_lines.append(subtotal_line)
-    order_lines.append(f"\nTasa BCV: Bs. {st.session_state.dollar_rate:,.2f} por USD")
+    order_lines.append("")
+    order_lines.append(f"Tasa BCV: Bs. {st.session_state.dollar_rate:,.2f} por USD")
+    order_lines.append("")
+    order_lines.append("=" * 50)
+    order_lines.append("¡GRACIAS POR SU PEDIDO!")
+    order_lines.append("=" * 50)
     
     return "\n".join(order_lines), subtotal_usd
+
+# --- FUNCIONES DE IMPRESIÓN 58MM ---
+
+def format_bar_ticket_58mm():
+    """Formatea el ticket para la barra (con precios) en formato 58mm."""
+    if not st.session_state.order:
+        return "PEDIDO VACÍO"
+    
+    # Configuración para 58mm (aproximadamente 32 caracteres por línea)
+    line_width = 32
+    
+    # Obtener tasa del dólar
+    if 'dollar_rate' not in st.session_state:
+        st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
+    
+    lines = []
+    lines.append("=" * line_width)
+    lines.append("CASTELL PIZZAS".center(line_width))
+    lines.append("TICKET BARRA".center(line_width))
+    lines.append("=" * line_width)
+    lines.append("")
+    
+    # Información del cliente
+    lines.append(f"CLIENTE: {st.session_state.customer_name or 'Sin nombre'}")
+    lines.append(f"TIPO: {st.session_state.order_type}")
+    lines.append("")
+    lines.append("-" * line_width)
+    lines.append("PEDIDO")
+    lines.append("-" * line_width)
+    
+    # Items del pedido con precios
+    subtotal_usd = 0.0
+    sorted_order = sorted(st.session_state.order.items())
+    
+    for item, quantity in sorted_order:
+        # Manejar delivery de forma especial
+        if item == "🚚 Delivery":
+            price_usd = quantity
+            total_item_price_usd = price_usd
+            total_item_price_bs = total_item_price_usd * st.session_state.dollar_rate
+            subtotal_usd += total_item_price_usd
+            
+            lines.append("Delivery")
+            lines.append(f"${total_item_price_usd:.2f}".rjust(line_width))
+            lines.append(f"Bs.{total_item_price_bs:,.0f}".rjust(line_width))
+            lines.append("")
+        else:
+            price_usd = get_item_price(item)
+            total_item_price_usd = price_usd * quantity
+            total_item_price_bs = total_item_price_usd * st.session_state.dollar_rate
+            subtotal_usd += total_item_price_usd
+            
+            # Formatear nombre del item (sin emoji para impresión)
+            item_clean = item.replace("🟢", "").replace("⚪", "").replace("🔴", "").strip()
+            
+            # Línea de cantidad y nombre
+            qty_line = f"{quantity}x {item_clean}"
+            lines.append(qty_line)
+            
+            # Líneas de precio
+            lines.append(f"${total_item_price_usd:.2f}".rjust(line_width))
+            lines.append(f"Bs.{total_item_price_bs:,.0f}".rjust(line_width))
+            lines.append("")
+    
+    # Subtotal
+    lines.append("-" * line_width)
+    subtotal_bs = subtotal_usd * st.session_state.dollar_rate
+    lines.append("SUBTOTAL:")
+    lines.append(f"${subtotal_usd:.2f}".rjust(line_width))
+    lines.append(f"Bs.{subtotal_bs:,.0f}".rjust(line_width))
+    lines.append("")
+    
+    # Información del dólar
+    lines.append("-" * line_width)
+    lines.append(f"Tasa BCV: Bs.{st.session_state.dollar_rate:,.2f}")
+    lines.append("")
+    
+    # Pie de página
+    lines.append("=" * line_width)
+    lines.append("GRACIAS POR SU COMPRA")
+    lines.append("=" * line_width)
+    
+    return "\n".join(lines)
+
+def format_kitchen_ticket_58mm():
+    """Formatea el ticket para la cocina (sin precios) en formato 58mm."""
+    if not st.session_state.order:
+        return "PEDIDO VACÍO"
+    
+    # Configuración para 58mm (aproximadamente 32 caracteres por línea)
+    line_width = 32
+    
+    lines = []
+    lines.append("=" * line_width)
+    lines.append("CASTELL PIZZERIA".center(line_width))
+    lines.append("TICKET COCINA".center(line_width))
+    lines.append("=" * line_width)
+    lines.append("")
+    
+    # Información del cliente
+    lines.append(f"CLIENTE: {st.session_state.customer_name or 'Sin nombre'}")
+    lines.append(f"TIPO: {st.session_state.order_type}")
+    lines.append("")
+    lines.append("-" * line_width)
+    lines.append("PEDIDO")
+    lines.append("-" * line_width)
+    
+    # Items del pedido sin precios
+    sorted_order = sorted(st.session_state.order.items())
+    
+    for item, quantity in sorted_order:
+        # Saltar delivery en ticket de cocina
+        if item == "🚚 Delivery":
+            continue
+            
+        # Formatear nombre del item (sin emoji para impresión)
+        item_clean = item.replace("🟢", "").replace("⚪", "").replace("🔴", "").strip()
+        
+        # Solo cantidad y nombre del producto
+        qty_line = f"{quantity}x {item_clean}"
+        lines.append(qty_line)
+        lines.append("")  # Espacio entre items
+    
+    # Pie de página
+    lines.append("=" * line_width)
+    lines.append("BUEN PROVECHO!")
+    lines.append("=" * line_width)
+    
+    return "\n".join(lines)
+
+def generate_print_html(content, title="Ticket"):
+    """Genera HTML optimizado para impresión térmica 58mm."""
+    # Escapar el contenido para HTML
+    import html
+    escaped_content = html.escape(content)
+    
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{title} - Castell Pizzeria</title>
+    <style>
+        @media print {{
+            @page {{
+                size: 58mm auto;
+                margin: 1mm;
+            }}
+            body {{
+                margin: 0;
+                padding: 0;
+                font-size: 10px;
+            }}
+            .no-print {{
+                display: none !important;
+            }}
+        }}
+        
+        body {{
+            font-family: 'Courier New', 'Lucida Console', monospace;
+            font-size: 11px;
+            line-height: 1.1;
+            margin: 0;
+            padding: 8px;
+            width: 58mm;
+            max-width: 58mm;
+            background: white;
+            color: black;
+        }}
+        
+        .print-content {{
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.1;
+        }}
+        
+        .no-print {{
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }}
+        
+        .print-btn {{
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }}
+        
+        .print-btn.primary {{
+            background: #4CAF50;
+            color: white;
+        }}
+        
+        .print-btn.primary:hover {{
+            background: #45a049;
+        }}
+        
+        .print-btn.secondary {{
+            background: #f44336;
+            color: white;
+        }}
+        
+        .print-btn.secondary:hover {{
+            background: #da190b;
+        }}
+        
+        @media screen {{
+            body {{
+                background: #f0f0f0;
+                padding: 20px;
+                max-width: none;
+                width: auto;
+            }}
+            .print-content {{
+                background: white;
+                padding: 15px;
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                max-width: 58mm;
+                margin: 0 auto;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }}
+        }}
+        
+        .instructions {{
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 12px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <h3>🖨️ Impresión de Ticket Térmico 58mm</h3>
+        <div class="instructions">
+            <strong>📋 Instrucciones:</strong><br>
+            1. Asegúrate de que tu impresora térmica esté encendida<br>
+            2. Haz clic en "Imprimir" y selecciona tu impresora térmica<br>
+            3. En configuración de impresión, selecciona tamaño personalizado: 58mm de ancho<br>
+            4. Desactiva márgenes o ponlos al mínimo
+        </div>
+        <button onclick="printTicket()" class="print-btn primary">
+            🖨️ Imprimir {title}
+        </button>
+        <button onclick="window.close()" class="print-btn secondary">
+            ❌ Cerrar Ventana
+        </button>
+    </div>
+    <div class="print-content">{escaped_content}</div>
+    <script>
+        // Auto-abrir diálogo de impresión inmediatamente
+        window.addEventListener('load', function() {{
+            // Abrir diálogo de impresión automáticamente
+            setTimeout(function() {{
+                window.print();
+            }}, 300);
+        }});
+        
+        // Función para imprimir manualmente
+        function printTicket() {{
+            window.print();
+        }}
+        
+        // Cerrar ventana después de imprimir
+        window.addEventListener('afterprint', function() {{
+            setTimeout(function() {{
+                if (confirm('¿Deseas cerrar esta ventana?')) {{
+                    window.close();
+                }}
+            }}, 1000);
+        }});
+    </script>
+</body>
+</html>"""
+    
+    return html_content
+
+# --- FUNCIONES DE IMPRESIÓN TÉRMICA ---
+
+def detect_thermal_printers():
+    """Detecta impresoras térmicas disponibles en el sistema."""
+    printers = []
+    
+    if not ESCPOS_AVAILABLE:
+        return printers
+    
+    # Detectar impresoras USB (más común para impresoras térmicas)
+    try:
+        # Intentar detectar impresoras USB comunes
+        common_usb_ids = [
+            (0x04b8, 0x0202),  # Epson TM-T20
+            (0x04b8, 0x0203),  # Epson TM-T70
+            (0x04b8, 0x0205),  # Epson TM-T88
+            (0x0519, 0x0001),  # Star TSP100
+            (0x0519, 0x0003),  # Star TSP650
+            (0x154f, 0x154f),  # Generic thermal printer
+        ]
+        
+        for vendor_id, product_id in common_usb_ids:
+            try:
+                printer = Usb(vendor_id, product_id)
+                printers.append({
+                    'type': 'USB',
+                    'name': f'USB Printer ({hex(vendor_id)}:{hex(product_id)})',
+                    'connection': (vendor_id, product_id)
+                })
+            except:
+                continue
+                
+    except Exception:
+        pass
+    
+    # Detectar puertos serie (COM en Windows)
+    if platform.system() == "Windows":
+        for i in range(1, 10):  # COM1 a COM9
+            try:
+                port = f"COM{i}"
+                # No intentar conectar aquí, solo listar puertos potenciales
+                printers.append({
+                    'type': 'Serial',
+                    'name': f'Puerto Serie {port}',
+                    'connection': port
+                })
+            except:
+                continue
+    else:
+        # Linux/Mac
+        import glob
+        serial_ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+        for port in serial_ports:
+            printers.append({
+                'type': 'Serial',
+                'name': f'Puerto Serie {port}',
+                'connection': port
+            })
+    
+    return printers
+
+def print_thermal_ticket(content, printer_config=None):
+    """Imprime un ticket en impresora térmica."""
+    if not ESCPOS_AVAILABLE:
+        return False, "La librería python-escpos no está instalada"
+    
+    try:
+        # Configuración por defecto (archivo para pruebas)
+        if not printer_config:
+            # Crear archivo temporal para pruebas
+            temp_file = f"ticket_temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            printer = File(temp_file)
+        else:
+            # Usar configuración específica
+            if printer_config['type'] == 'USB':
+                vendor_id, product_id = printer_config['connection']
+                printer = Usb(vendor_id, product_id)
+            elif printer_config['type'] == 'Serial':
+                port = printer_config['connection']
+                printer = Serial(port, baudrate=9600)
+            elif printer_config['type'] == 'Network':
+                ip = printer_config['connection']
+                printer = Network(ip)
+            else:
+                return False, "Tipo de impresora no soportado"
+        
+        # Configurar impresora para 58mm
+        printer.set(align='left', font='a', bold=False, underline=False, width=1, height=1)
+        
+        # Imprimir contenido línea por línea
+        lines = content.split('\n')
+        for line in lines:
+            if line.strip() == "":
+                printer.ln()
+            elif line.startswith("="):
+                printer.set(bold=True)
+                printer.text(line + '\n')
+                printer.set(bold=False)
+            elif "CASTELL" in line or "TICKET" in line:
+                printer.set(align='center', bold=True)
+                printer.text(line + '\n')
+                printer.set(align='left', bold=False)
+            elif line.startswith("-"):
+                printer.text(line + '\n')
+            elif "SUBTOTAL" in line or "TOTAL" in line:
+                printer.set(bold=True)
+                printer.text(line + '\n')
+                printer.set(bold=False)
+            else:
+                printer.text(line + '\n')
+        
+        # Cortar papel
+        printer.cut()
+        printer.close()
+        
+        return True, "Ticket impreso correctamente"
+        
+    except USBNotFoundError:
+        return False, "Impresora USB no encontrada. Verifica que esté conectada y encendida."
+    except SerialException:
+        return False, "Error en puerto serie. Verifica la conexión y configuración."
+    except Exception as e:
+        return False, f"Error de impresión: {str(e)}"
+
+def print_to_system_printer(content, printer_name=None):
+    """Imprime usando las impresoras del sistema (Windows/Linux/Mac)."""
+    try:
+        # Crear archivo temporal
+        temp_file = f"ticket_temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        # Comando de impresión según el sistema operativo
+        if platform.system() == "Windows":
+            if printer_name:
+                os.system(f'print /D:"{printer_name}" "{temp_file}"')
+            else:
+                os.system(f'print "{temp_file}"')
+        elif platform.system() == "Darwin":  # macOS
+            if printer_name:
+                os.system(f'lpr -P "{printer_name}" "{temp_file}"')
+            else:
+                os.system(f'lpr "{temp_file}"')
+        else:  # Linux
+            if printer_name:
+                os.system(f'lpr -P "{printer_name}" "{temp_file}"')
+            else:
+                os.system(f'lpr "{temp_file}"')
+        
+        # Limpiar archivo temporal
+        try:
+            os.remove(temp_file)
+        except:
+            pass
+            
+        return True, "Ticket enviado a impresora del sistema"
+        
+    except Exception as e:
+        return False, f"Error al imprimir: {str(e)}"
 
 # --- INTERFAZ DE USUARIO ---
 st.title("🍕 Pedidos whatsapp")
@@ -636,6 +1118,32 @@ with col2:
         st.success(f"Tasa actualizada: Bs. {st.session_state.dollar_rate:,.2f}")
 with col3:
     show_usd = st.checkbox("Mostrar USD", value=True)
+
+# --- INFORMACIÓN DE IMPRESIÓN ---
+with st.expander("ℹ️ Información sobre Impresión Térmica", expanded=False):
+    st.markdown("""
+    ### 🖨️ Cómo imprimir en tu impresora térmica de 58mm:
+    
+    **Pasos para imprimir:**
+    1. Haz clic en el botón "🖨️ Imprimir Ticket"
+    2. Se abrirá una ventana optimizada para impresión
+    3. En el diálogo de impresión, selecciona tu impresora térmica
+    4. **Importante:** Configura el tamaño de papel como "Personalizado" o "58mm"
+    5. Ajusta los márgenes al mínimo (0mm si es posible)
+    
+    **Impresoras térmicas compatibles:**
+    - Epson TM-T20, TM-T70, TM-T88
+    - Star TSP100, TSP650
+    - Bixolon SRP-350
+    - Cualquier impresora térmica de 58mm
+    
+    **Consejos:**
+    - Asegúrate de que la impresora esté encendida y con papel
+    - Si no tienes impresora térmica, puedes usar cualquier impresora normal
+    - Los tickets están optimizados para 32 caracteres por línea
+    """)
+
+st.markdown("---")
 
 # --- BUSCADOR ---
 col_search, col_clear = st.columns([4, 1])
@@ -676,22 +1184,52 @@ if not search_term:
 st.markdown("**Leyenda de tamaños:** 🟢 Personal (25cm) | ⚪ Mediana (33cm) | 🔴 Familiar (40cm)")
 
 with st.sidebar:
+    # --- INFORMACIÓN DEL CLIENTE ---
+    st.header("👤 Información del Cliente")
+    
+    # Campo para el nombre del cliente
+    customer_name = st.text_input("Nombre del cliente:", value=st.session_state.customer_name, placeholder="Ej: Juan Pérez")
+    if customer_name != st.session_state.customer_name:
+        st.session_state.customer_name = customer_name
+    
+    # Botones para tipo de pedido
+    st.subheader("📍 Tipo de Pedido")
+    
+    if st.button("🍽️ Comer aquí", use_container_width=True, 
+                 type="primary" if st.session_state.order_type == "Para comer aquí" else "secondary"):
+        st.session_state.order_type = "Para comer aquí"
+    
+    if st.button("🥡 Pickup", use_container_width=True,
+                 type="primary" if st.session_state.order_type == "Para llevar (PICKUP)" else "secondary"):
+        st.session_state.order_type = "Para llevar (PICKUP)"
+    
+    if st.button("🚚 Delivery", use_container_width=True,
+                 type="primary" if st.session_state.order_type == "Para llevar (DELIVERY)" else "secondary"):
+        st.session_state.order_type = "Para llevar (DELIVERY)"
+    
+    # Mostrar selección actual
+    st.info(f"**Cliente:** {st.session_state.customer_name or 'Sin nombre'}")
+    st.info(f"**Tipo:** {st.session_state.order_type}")
+    
+    st.markdown("---")
+    
     st.header("🛒 Pedido Actual")
     if not st.session_state.order:
         st.info("El pedido está vacío.")
     else:
         sorted_order_items = sorted(st.session_state.order.items())
         for item, quantity in sorted_order_items:
-            col1, col2, col3 = st.columns([0.7, 0.15, 0.15])
-            with col1:
-                # Agregar emoji al pedido en el sidebar
-                size_emoji = get_size_emoji(item)
-                item_with_emoji = f"{size_emoji} {item}" if size_emoji else item
-                st.write(f"{quantity}x {item_with_emoji}")
-            with col2:
-                st.button("➕", key=f"add_{item}", on_click=add_to_order, args=(item,))
-            with col3:
-                st.button("➖", key=f"rem_{item}", on_click=remove_from_order, args=(item,))
+            # Agregar emoji al pedido en el sidebar
+            size_emoji = get_size_emoji(item)
+            item_with_emoji = f"{size_emoji} {item}" if size_emoji else item
+            st.write(f"{quantity}x {item_with_emoji}")
+            
+            # Botones de agregar y quitar en líneas separadas
+            if st.button(f"➕ Agregar {item}", key=f"add_{item}", use_container_width=True):
+                add_to_order(item)
+            if st.button(f"➖ Quitar {item}", key=f"rem_{item}", use_container_width=True):
+                remove_from_order(item)
+            st.markdown("---")
         st.markdown("---")
         order_text, subtotal = format_order_text()
         st.subheader("📝 Texto para Copiar")
@@ -701,34 +1239,122 @@ with st.sidebar:
         
         # Botones de Delivery
         st.subheader("🚚 Delivery")
-        delivery_col1, delivery_col2 = st.columns(2)
         
-        with delivery_col1:
-            st.markdown("<small>0km - 3km</small>", unsafe_allow_html=True)
-            if st.button("$1.50", key="delivery_1_5", use_container_width=True):
-                st.session_state.order["🚚 Delivery"] = 1.50
-            
-            st.markdown("<small>3.1km - 6km</small>", unsafe_allow_html=True)
-            if st.button("$2.50", key="delivery_2_5", use_container_width=True):
-                st.session_state.order["🚚 Delivery"] = 2.50
+        st.markdown("<small>0km - 3km</small>", unsafe_allow_html=True)
+        if st.button("$1.50", key="delivery_1_5", use_container_width=True):
+            st.session_state.order["🚚 Delivery"] = 1.50
         
-        with delivery_col2:
-            st.markdown("<small>6.1km - 8.5km</small>", unsafe_allow_html=True)
-            if st.button("$3.50", key="delivery_3_5", use_container_width=True):
-                st.session_state.order["🚚 Delivery"] = 3.50
-            
-            st.markdown("<small>8.6km - 10km</small>", unsafe_allow_html=True)
-            if st.button("$4.50", key="delivery_4_5", use_container_width=True):
-                st.session_state.order["🚚 Delivery"] = 4.50
+        st.markdown("<small>3.1km - 6km</small>", unsafe_allow_html=True)
+        if st.button("$2.50", key="delivery_2_5", use_container_width=True):
+            st.session_state.order["🚚 Delivery"] = 2.50
+        
+        st.markdown("<small>6.1km - 8.5km</small>", unsafe_allow_html=True)
+        if st.button("$3.50", key="delivery_3_5", use_container_width=True):
+            st.session_state.order["🚚 Delivery"] = 3.50
+        
+        st.markdown("<small>8.6km - 10km</small>", unsafe_allow_html=True)
+        if st.button("$4.50", key="delivery_4_5", use_container_width=True):
+            st.session_state.order["🚚 Delivery"] = 4.50
         
         # Botón para quitar delivery
         if "🚚 Delivery" in st.session_state.order:
             if st.button("❌ Quitar Delivery", use_container_width=True):
                 del st.session_state.order["🚚 Delivery"]
+        
+        # Botones de impresión
+        st.subheader("🖨️ Impresión 58mm")
+        
+        if st.button("💰 Imprimir Ticket Barra", use_container_width=True, help="Ticket con precios para la barra"):
+            # Generar contenido del ticket de barra
+            bar_content = format_bar_ticket_58mm()
+            
+            # Crear archivo HTML temporal
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            html_file = f"ticket_barra_{timestamp}.html"
+            
+            html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ticket Barra - Castell Pizzeria</title>
+    <style>
+        @page {{ size: 58mm auto; margin: 1mm; }}
+        body {{ font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.1; margin: 0; padding: 2mm; }}
+        .ticket {{ white-space: pre-wrap; }}
+    </style>
+</head>
+<body>
+    <div class="ticket">{bar_content}</div>
+    <script>
+        window.onload = function() {{
+            window.print();
+            setTimeout(function() {{ window.close(); }}, 2000);
+        }};
+    </script>
+</body>
+</html>"""
+            
+            # Guardar archivo HTML
+            with open(html_file, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            # Abrir archivo automáticamente
+            import webbrowser
+            import os
+            file_path = os.path.abspath(html_file)
+            webbrowser.open(f'file://{file_path}')
+            
+            st.success("✅ Abriendo ventana de impresión...")
+            st.info("💡 Se abrió una ventana para imprimir. Si no aparece, revisa si tu navegador bloquea ventanas emergentes.")
+        
+        if st.button("👨‍🍳 Imprimir Ticket Cocina", use_container_width=True, help="Ticket sin precios para la cocina"):
+            # Generar contenido del ticket de cocina
+            kitchen_content = format_kitchen_ticket_58mm()
+            
+            # Crear archivo HTML temporal
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            html_file = f"ticket_cocina_{timestamp}.html"
+            
+            html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ticket Cocina - Castell Pizzeria</title>
+    <style>
+        @page {{ size: 58mm auto; margin: 1mm; }}
+        body {{ font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.1; margin: 0; padding: 2mm; }}
+        .ticket {{ white-space: pre-wrap; }}
+    </style>
+</head>
+<body>
+    <div class="ticket">{kitchen_content}</div>
+    <script>
+        window.onload = function() {{
+            window.print();
+            setTimeout(function() {{ window.close(); }}, 2000);
+        }};
+    </script>
+</body>
+</html>"""
+            
+            # Guardar archivo HTML
+            with open(html_file, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            # Abrir archivo automáticamente
+            import webbrowser
+            import os
+            file_path = os.path.abspath(html_file)
+            webbrowser.open(f'file://{file_path}')
+            
+            st.success("✅ Abriendo ventana de impresión...")
+            st.info("💡 Se abrió una ventana para imprimir. Si no aparece, revisa si tu navegador bloquea ventanas emergentes.")
 
     
     if st.button("🗑️ Reiniciar Pedido", use_container_width=True):
         st.session_state.order.clear()
+        st.session_state.customer_name = ""
+        st.session_state.order_type = "Para comer aquí"
 
 # --- MENÚ PRINCIPAL ---
 # Aplicar filtro de búsqueda

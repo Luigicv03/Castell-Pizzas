@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ticket Cocina - Castell Pizzeria</title>
+    <style>
+        @page { size: 58mm auto; margin: 1mm; }
+        body { font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.1; margin: 0; padding: 2mm; }
+        .ticket { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="ticket">================================
+        CASTELL PIZZERIA        
+         TICKET COCINA          
+================================
+
+CLIENTE: angelo 
+TIPO: Para llevar (PICKUP)
+
+--------------------------------
+PEDIDO
+--------------------------------
+1x Di Abruzzo (Familiar 40cm)
+
+================================
+BUEN PROVECHO!
+================================</div>
+    <script>
+        window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 2000);
+        };
+    </script>
+</body>
+</html>
