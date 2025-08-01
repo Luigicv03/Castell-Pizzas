@@ -642,12 +642,12 @@ def format_order_text():
 # --- FUNCIONES DE IMPRESIÓN 58MM ---
 
 def format_bar_ticket_58mm():
-    """Formatea el ticket para la barra (con precios) en formato 58mm."""
+    """Formatea el ticket para la barra (con precios) en formato 80mm."""
     if not st.session_state.order:
         return "PEDIDO VACÍO"
     
-    # Configuración para 58mm (aproximadamente 32 caracteres por línea)
-    line_width = 32
+    # Configuración para 80mm (aproximadamente 48 caracteres por línea)
+    line_width = 48
     
     # Obtener tasa del dólar
     if 'dollar_rate' not in st.session_state:
@@ -723,12 +723,12 @@ def format_bar_ticket_58mm():
     return "\n".join(lines)
 
 def format_kitchen_ticket_58mm():
-    """Formatea el ticket para la cocina (sin precios) en formato 58mm."""
+    """Formatea el ticket para la cocina (sin precios) en formato 80mm."""
     if not st.session_state.order:
         return "PEDIDO VACÍO"
     
-    # Configuración para 58mm (aproximadamente 32 caracteres por línea)
-    line_width = 32
+    # Configuración para 80mm (aproximadamente 48 caracteres por línea)
+    line_width = 48
     
     lines = []
     lines.append("=" * line_width)
@@ -1122,25 +1122,25 @@ with col3:
 # --- INFORMACIÓN DE IMPRESIÓN ---
 with st.expander("ℹ️ Información sobre Impresión Térmica", expanded=False):
     st.markdown("""
-    ### 🖨️ Cómo imprimir en tu impresora térmica de 58mm:
+    ### 🖨️ Cómo imprimir en tu impresora térmica de 80mm:
     
     **Pasos para imprimir:**
     1. Haz clic en el botón "🖨️ Imprimir Ticket"
     2. Se abrirá una ventana optimizada para impresión
     3. En el diálogo de impresión, selecciona tu impresora térmica
-    4. **Importante:** Configura el tamaño de papel como "Personalizado" o "58mm"
+    4. **Importante:** Configura el tamaño de papel como "Personalizado" o "80mm"
     5. Ajusta los márgenes al mínimo (0mm si es posible)
     
     **Impresoras térmicas compatibles:**
-    - Epson TM-T20, TM-T70, TM-T88
-    - Star TSP100, TSP650
-    - Bixolon SRP-350
-    - Cualquier impresora térmica de 58mm
+    - Epson TM-T20II, TM-T82, TM-T88V
+    - Star TSP143, TSP654
+    - Bixolon SRP-330II, SRP-350III
+    - Cualquier impresora térmica de 80mm
     
     **Consejos:**
     - Asegúrate de que la impresora esté encendida y con papel
     - Si no tienes impresora térmica, puedes usar cualquier impresora normal
-    - Los tickets están optimizados para 32 caracteres por línea
+    - Los tickets están optimizados para 48 caracteres por línea
     """)
 
 st.markdown("---")
@@ -1262,7 +1262,7 @@ with st.sidebar:
                 del st.session_state.order["🚚 Delivery"]
         
         # Botones de impresión
-        st.subheader("🖨️ Impresión 58mm")
+        st.subheader("🖨️ Impresión 80mm")
         
         if st.button("💰 Imprimir Ticket Barra", use_container_width=True, help="Ticket con precios para la barra"):
             # Generar contenido del ticket de barra
@@ -1278,8 +1278,8 @@ with st.sidebar:
     <meta charset="UTF-8">
     <title>Ticket Barra - Castell Pizzeria</title>
     <style>
-        @page {{ size: 58mm auto; margin: 1mm; }}
-        body {{ font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.1; margin: 0; padding: 2mm; }}
+        @page {{ size: 80mm auto; margin: 1mm; }}
+        body {{ font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.1; margin: 0; padding: 2mm; width: 80mm; }}
         .ticket {{ white-space: pre-wrap; }}
     </style>
 </head>
@@ -1305,7 +1305,7 @@ with st.sidebar:
             webbrowser.open(f'file://{file_path}')
             
             st.success("✅ Abriendo ventana de impresión...")
-            st.info("💡 Se abrió una ventana para imprimir. Si no aparece, revisa si tu navegador bloquea ventanas emergentes.")
+            st.info("💡 Se abrió una ventana para imprimir en formato 80mm. Si no aparece, revisa si tu navegador bloquea ventanas emergentes.")
         
         if st.button("👨‍🍳 Imprimir Ticket Cocina", use_container_width=True, help="Ticket sin precios para la cocina"):
             # Generar contenido del ticket de cocina
@@ -1321,8 +1321,8 @@ with st.sidebar:
     <meta charset="UTF-8">
     <title>Ticket Cocina - Castell Pizzeria</title>
     <style>
-        @page {{ size: 58mm auto; margin: 1mm; }}
-        body {{ font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.1; margin: 0; padding: 2mm; }}
+        @page {{ size: 80mm auto; margin: 1mm; }}
+        body {{ font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.1; margin: 0; padding: 2mm; width: 80mm; }}
         .ticket {{ white-space: pre-wrap; }}
     </style>
 </head>
@@ -1348,7 +1348,7 @@ with st.sidebar:
             webbrowser.open(f'file://{file_path}')
             
             st.success("✅ Abriendo ventana de impresión...")
-            st.info("💡 Se abrió una ventana para imprimir. Si no aparece, revisa si tu navegador bloquea ventanas emergentes.")
+            st.info("💡 Se abrió una ventana para imprimir en formato 80mm. Si no aparece, revisa si tu navegador bloquea ventanas emergentes.")
 
     
     if st.button("🗑️ Reiniciar Pedido", use_container_width=True):
