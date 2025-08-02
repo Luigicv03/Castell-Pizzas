@@ -98,7 +98,7 @@ MENU = {
         "Refresco de Lata": 2.00,
         "Té Verde (tomar aquí)": 2.00,
         "Té Verde (Para llevar)": 2.80,
-        "Té Negro (tomar aqui aquí)": 2.00,
+        "Té Negro (tomar aqui)": 2.00,
         "Té Negro (Para llevar)": 2.80,
         "Flor de Jamaica (Tomar aquí)": 2.00,
         "Flor de Jamaica (Para llevar)": 2.80,
@@ -1241,117 +1241,131 @@ with st.sidebar:
             # Generar contenido del ticket de barra
             bar_content = format_bar_ticket_58mm()
             
-            # Crear archivo HTML temporal
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            html_file = f"ticket_barra_{timestamp}.html"
+            # Abrir directamente el diálogo de impresión
+            st.components.v1.html(f"""
+            <div id="printContent" style="
+                font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace; 
+                font-size: 11px; 
+                font-weight: normal;
+                line-height: 1.2; 
+                white-space: pre-wrap; 
+                color: #333333;
+                padding: 10px;
+                border: 1px solid #ccc;
+                background: white;
+                margin: 10px 0;
+            ">
+{bar_content}
+            </div>
             
-            html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Ticket Barra - Castell Pizzeria</title>
-    <style>
-        @page {{ size: 80mm auto; margin: 1mm; }}
-        body {{ 
-            font-family: 'Courier New', 'Lucida Console', monospace; 
-            font-size: 12px; 
-            font-weight: bold;
-            line-height: 1.2; 
-            margin: 0; 
-            padding: 2mm; 
-            width: 80mm; 
-            color: #000000;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }}
-        .ticket {{ 
-            white-space: pre-wrap; 
-            font-weight: bold;
-            color: #000000;
-        }}
-    </style>
-</head>
-<body>
-    <div class="ticket">{bar_content}</div>
-    <script>
-        window.onload = function() {{
-            window.print();
-            setTimeout(function() {{ window.close(); }}, 2000);
-        }};
-    </script>
-</body>
-</html>"""
+            <style>
+                @media print {{
+                    body * {{
+                        visibility: hidden !important;
+                    }}
+                    #printContent, #printContent * {{
+                        visibility: visible !important;
+                        display: block !important;
+                    }}
+                    #printContent {{
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 80mm !important;
+                        font-size: 16px !important;
+                        font-weight: 900 !important;
+                        color: #000000 !important;
+                        font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace !important;
+                        text-shadow: 1px 1px 0px #000000 !important;
+                        white-space: pre-wrap !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        background: white !important;
+                        padding: 2mm !important;
+                        margin: 0 !important;
+                        border: none !important;
+                        line-height: 1.3 !important;
+                        letter-spacing: 0.5px !important;
+                    }}
+                    @page {{
+                        size: 80mm auto;
+                        margin: 2mm;
+                    }}
+                }}
+            </style>
             
-            # Guardar archivo HTML
-            with open(html_file, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            
-            # Abrir archivo automáticamente
-            import webbrowser
-            import os
-            file_path = os.path.abspath(html_file)
-            webbrowser.open(f'file://{file_path}')
-            
-            st.success("✅ Abriendo ventana de impresión...")
-            st.info("💡 Se abrió una ventana para imprimir en formato 80mm. Si no aparece, revisa si tu navegador bloquea ventanas emergentes.")
+            <script>
+                // Abrir diálogo de impresión inmediatamente
+                setTimeout(function() {{
+                    window.print();
+                }}, 300);
+            </script>
+            """, height=200)
         
         if st.button("👨‍🍳 Imprimir Ticket Cocina", use_container_width=True, help="Ticket sin precios para la cocina"):
             # Generar contenido del ticket de cocina
             kitchen_content = format_kitchen_ticket_58mm()
             
-            # Crear archivo HTML temporal
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            html_file = f"ticket_cocina_{timestamp}.html"
+            # Abrir directamente el diálogo de impresión
+            st.components.v1.html(f"""
+            <div id="printContentKitchen" style="
+                font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace; 
+                font-size: 11px; 
+                font-weight: normal;
+                line-height: 1.2; 
+                white-space: pre-wrap; 
+                color: #333333;
+                padding: 10px;
+                border: 1px solid #ccc;
+                background: white;
+                margin: 10px 0;
+            ">
+{kitchen_content}
+            </div>
             
-            html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Ticket Cocina</title>
-    <style>
-        @page {{ size: 80mm auto; margin: 1mm; }}
-        body {{ 
-            font-family: 'Courier New', 'Lucida Console', monospace; 
-            font-size: 12px; 
-            font-weight: bold;
-            line-height: 1.2; 
-            margin: 0; 
-            padding: 2mm; 
-            width: 80mm; 
-            color: #000000;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }}
-        .ticket {{ 
-            white-space: pre-wrap; 
-            font-weight: bold;
-            color: #000000;
-        }}
-    </style>
-</head>
-<body>
-    <div class="ticket">{kitchen_content}</div>
-    <script>
-        window.onload = function() {{
-            window.print();
-            setTimeout(function() {{ window.close(); }}, 2000);
-        }};
-    </script>
-</body>
-</html>"""
+            <style>
+                @media print {{
+                    body * {{
+                        visibility: hidden !important;
+                    }}
+                    #printContentKitchen, #printContentKitchen * {{
+                        visibility: visible !important;
+                        display: block !important;
+                    }}
+                    #printContentKitchen {{
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 80mm !important;
+                        font-size: 16px !important;
+                        font-weight: 900 !important;
+                        color: #000000 !important;
+                        font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace !important;
+                        text-shadow: 1px 1px 0px #000000 !important;
+                        white-space: pre-wrap !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        background: white !important;
+                        padding: 2mm !important;
+                        margin: 0 !important;
+                        border: none !important;
+                        line-height: 1.3 !important;
+                        letter-spacing: 0.5px !important;
+                    }}
+                    @page {{
+                        size: 80mm auto;
+                        margin: 2mm;
+                    }}
+                }}
+            </style>
             
-            # Guardar archivo HTML
-            with open(html_file, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            
-            # Abrir archivo automáticamente
-            import webbrowser
-            import os
-            file_path = os.path.abspath(html_file)
-            webbrowser.open(f'file://{file_path}')
-            
-            st.success("✅ Abriendo ventana de impresión...")
-            st.info("💡 Se abrió una ventana para imprimir en formato 80mm. Si no aparece, revisa si tu navegador bloquea ventanas emergentes.")
+            <script>
+                // Abrir diálogo de impresión inmediatamente
+                setTimeout(function() {{
+                    window.print();
+                }}, 300);
+            </script>
+            """, height=200)
 
     
     if st.button("🗑️ Reiniciar Pedido", use_container_width=True):
