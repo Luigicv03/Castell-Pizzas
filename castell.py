@@ -737,8 +737,19 @@ def remove_from_order(item_name):
             del st.session_state.order[item_name]
 
 
+def compact_item_label(item_name):
+    """Etiqueta corta: nombre + tamaño, sin precios ni centímetros."""
+    if "(" in item_name and ")" in item_name:
+        base_name = item_name.split(" (")[0]
+        size_raw = item_name.split("(")[1].split(")")[0]
+        size_clean = size_raw.replace("25cm", "").replace("33cm", "").replace("35cm", "").replace("40cm", "").replace("20cm", "").strip()
+        if size_clean:
+            return f"{base_name} ({size_clean})"
+    return item_name
+
+
 def render_menu_item_row(category, item_name, price, *, show_usd):
-    """Una fila del menú: botones grandes; pizzas con flujo de extras rápido."""
+    """Una fila del menú en formato compacto para móvil."""
     use_small_buttons = "Ingredientes" in category or "Adicionales Calzone" in category
     use_pizza_flow = category in PIZZA_QUICK_ADD_CATEGORIES
     size_emoji = get_size_emoji(item_name)
@@ -759,20 +770,22 @@ def render_menu_item_row(category, item_name, price, *, show_usd):
                 display_name = item_name
         if size_emoji:
             display_name = f"{size_emoji} {display_name}"
-        b_col1, b_col2 = st.columns([0.7, 0.3])
-        with b_col1:
-            st.button(display_name, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
-        with b_col2:
-            price_text = format_currency(price, show_usd)
-            st.markdown(f"**{price_text}**", help=f"Precio: {format_currency(price, True)}")
+        st.button(display_name, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
     else:
-        price_text = format_currency(price, show_usd)
-        button_text = f"{size_emoji} {item_name}" if size_emoji else item_name
-        button_label = f"{button_text} — {price_text}"
+        short_name = compact_item_label(item_name)
+        button_label = f"{size_emoji} {short_name}" if size_emoji else short_name
         if use_pizza_flow:
             st.button(button_label, key=item_name, on_click=start_pizza_order, args=(item_name,), use_container_width=True)
         else:
             st.button(button_label, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
+
+
+def render_category_grid(category, items, *, show_usd, columns_count=2):
+    """Renderiza una categoría en grid compacto para reducir scroll."""
+    cols = st.columns(columns_count)
+    for idx, (item_name, price) in enumerate(items.items()):
+        with cols[idx % columns_count]:
+            render_menu_item_row(category, item_name, price, show_usd=show_usd)
 
 
 def format_order_text():
@@ -1625,12 +1638,10 @@ if not search_term:
                 if cat not in filtered_menu:
                     continue
                 st.markdown(f"#### {cat}")
-                for item_name, price in filtered_menu[cat].items():
-                    render_menu_item_row(cat, item_name, price, show_usd=show_usd)
+                render_category_grid(cat, filtered_menu[cat], show_usd=show_usd, columns_count=2)
                 st.markdown("")
 else:
     for category, items in filtered_menu.items():
         st.markdown(f"#### {category}")
-        for item_name, price in items.items():
-            render_menu_item_row(category, item_name, price, show_usd=show_usd)
+        render_category_grid(category, items, show_usd=show_usd, columns_count=2)
         st.markdown("")
