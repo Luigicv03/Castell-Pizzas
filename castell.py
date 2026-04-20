@@ -696,21 +696,18 @@ def render_pizza_quick_panel(show_usd):
     def render_extra_grid(items_list, key_prefix):
         if not items_list:
             return
-        cols = st.columns(2)
+        cols = st.columns(3)
         for i, (fk, pr) in enumerate(items_list):
-            with cols[i % 2]:
+            with cols[i % 3]:
                 cnt = st.session_state.pending_extra_counts.get(fk, 0)
                 label = short_ingredient_menu_label(fk)
-                b0, b1, b2 = st.columns([1, 3.2, 1])
+                st.markdown(f"<div style='text-align:center;line-height:1.1;min-height:2.1rem'><small><b>{label}</b></small></div>", unsafe_allow_html=True)
+                b0, b1, b2 = st.columns([1, 1.1, 1])
                 with b0:
                     if st.button("−", key=f"{key_prefix}_m_{i}", use_container_width=True, disabled=cnt <= 0):
                         adjust_pending_extra(fk, -1)
                 with b1:
-                    st.markdown(
-                        f"<div style='text-align:center;line-height:1.2;padding:6px 0'><b>{label}</b><br>"
-                        f"<span style='font-size:1rem'>{cnt}×</span></div>",
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown(f"<div style='text-align:center;padding-top:0.2rem'><b>{cnt}×</b></div>", unsafe_allow_html=True)
                 with b2:
                     if st.button("+", key=f"{key_prefix}_p_{i}", use_container_width=True):
                         adjust_pending_extra(fk, 1)
@@ -776,7 +773,7 @@ def render_menu_item_row(category, item_name, price, *, show_usd):
             else:
                 display_name = item_name
         count = st.session_state.order.get(item_name, 0)
-        c1, c2, c3 = st.columns([1, 3.8, 1])
+        c1, c2, c3 = st.columns([1, 2.2, 1])
         with c1:
             st.button("−", key=f"minus_{item_name}", on_click=remove_from_order, args=(item_name,), use_container_width=True, disabled=count == 0)
         with c2:
@@ -1319,8 +1316,8 @@ st.markdown(
 <style>
     .block-container { padding-top: 0.75rem !important; padding-bottom: 2rem !important; max-width: 42rem; }
     button[kind="secondary"], button[kind="primary"] {
-        min-height: 2.1rem !important;
-        font-size: 0.92rem !important;
+        min-height: 1.75rem !important;
+        font-size: 0.88rem !important;
     }
     div[data-testid="stSidebarNav"] { font-size: 1rem; }
 </style>
@@ -1651,10 +1648,12 @@ if not search_term:
                 if cat not in filtered_menu:
                     continue
                 st.markdown(f"#### {cat}")
-                render_category_grid(cat, filtered_menu[cat], show_usd=show_usd, columns_count=2)
+                grid_cols = 3 if ("Ingredientes" in cat or "Adicionales Calzone" in cat) else 2
+                render_category_grid(cat, filtered_menu[cat], show_usd=show_usd, columns_count=grid_cols)
                 st.markdown("")
 else:
     for category, items in filtered_menu.items():
         st.markdown(f"#### {category}")
-        render_category_grid(category, items, show_usd=show_usd, columns_count=2)
+        grid_cols = 3 if ("Ingredientes" in category or "Adicionales Calzone" in category) else 2
+        render_category_grid(category, items, show_usd=show_usd, columns_count=grid_cols)
         st.markdown("")
