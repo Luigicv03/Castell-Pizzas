@@ -17,7 +17,8 @@ except ImportError:
 st.set_page_config(
     page_title="Pedidos whatsapp",
     page_icon="🍕",
-    layout="wide"
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -26,41 +27,42 @@ st.set_page_config(
 # --- DATOS DEL MENÚ ---
 MENU = {
     "Pizzas Tradicionales": {
-        "Margherita (Personal 25cm)": 5.00,
-        "Margherita (Mediana 33cm)": 7.50,
-        "Margherita (Familiar 40cm)": 10.00,
-        "Jamón (Personal 25cm)": 6.00,
-        "Jamón (Mediana 33cm)": 9.00,
-        "Jamón (Familiar 40cm)": 12.00,
-        "Tocineta y Maíz (Personal 25cm)": 7.50,
-        "Tocineta y Maíz (Mediana 33cm)": 11.00,
-        "Tocineta y Maíz (Familiar 40cm)": 15.00,
-        "4 Estaciones (Personal 25cm)": 10.00,
-        "4 Estaciones (Mediana 33cm)": 14.50,
-        "4 Estaciones (Familiar 40cm)": 20.00,
+        "Margherita (Personal 25cm)": 6.50,
+        "Margherita (Mediana 33cm)": 10.00,
+        "Margherita (Familiar 40cm)": 13.00,
+        "Jamón (Personal 25cm)": 7.50,
+        "Jamón (Mediana 33cm)": 11.50,
+        "Jamón (Familiar 40cm)": 15.00,
+        "Tocineta y Maíz (Personal 25cm)": 9.00,
+        "Tocineta y Maíz (Mediana 33cm)": 13.50,
+        "Tocineta y Maíz (Familiar 40cm)": 18.00,
+        "4 Estaciones (Personal 25cm)": 11.50,
+        "4 Estaciones (Mediana 33cm)": 17.00,
+        "4 Estaciones (Familiar 40cm)": 23.00,
     },
     "Pizzas Especiales": {
-        "Di Abruzzo (Personal 25cm)": 8.00,
-        "Di Abruzzo (Mediana 33cm)": 10.50,
-        "Di Abruzzo (Familiar 40cm)": 16.00,
-        "Castell 1 (Personal 25cm)": 11.00,
-        "Castell 1 (Mediana 33cm)": 16.00,
-        "Castell 1 (Familiar 40cm)": 22.00,
-        "Castell 2 (Personal 25cm)": 12.00,
-        "Castell 2 (Mediana 33cm)": 17.00,
-        "Castell 2 (Familiar 40cm)": 24.00,
+        "Di Abruzzo (Personal 25cm)": 9.50,
+        "Di Abruzzo (Mediana 33cm)": 13.00,
+        "Di Abruzzo (Familiar 40cm)": 19.00,
+        "Castell 1 (Personal 25cm)": 12.50,
+        "Castell 1 (Mediana 33cm)": 18.50,
+        "Castell 1 (Familiar 40cm)": 25.00,
+        "Castell 2 (Personal 25cm)": 13.50,
+        "Castell 2 (Mediana 33cm)": 19.50,
+        "Castell 2 (Familiar 40cm)": 27.00,
     },
     "Otros Platos": {
-        "Pizza Multicereal (Personal 25cm)": 12.00,
-        "Pizza Multicereal (Mediana 35cm)": 17.00,
-        "Pizza Multicereal (Familiar 40cm)": 24.00,
-        "Pizza Dolce (Personal 20cm)": 5.50,
-        "Calzone (Comer aquí)": 4.50,
-        "Calzone (Para llevar)": 5.00,
-        "Pasticho Tradicional (Comer aquí)": 7.00,
-        "Pasticho Tradicional (Para llevar)": 7.50,
-        "Pasticho Berenjena/Platano/Zucchini (Comer aquí)": 7.00,
-        "Pasticho Berenjena/Platano/Zucchini (Para llevar)": 7.50,
+        "Pizza Multicereal (Personal 25cm)": 13.50,
+        "Pizza Multicereal (Mediana 33cm)": 19.50,
+        "Pizza Multicereal (Familiar 40cm)": 27.00,
+        "Pizza Dolce Nocciola (20cm)": 7.00,
+        "Pizza Dolce Pistacchio (20cm)": 10.00,
+        "Calzone (Comer aquí)": 6.00,
+        "Calzone (Para llevar)": 6.50,
+        "Pasticho Tradicional (Comer aquí)": 9.00,
+        "Pasticho Tradicional (Para llevar)": 9.50,
+        "Pasticho Berenjena/Platano/Zucchini (Comer aquí)": 9.00,
+        "Pasticho Berenjena/Platano/Zucchini (Para llevar)": 9.50,
     },
     "Ingredientes Tradicionales (Pizza)": {
         "Jamón Adicional (Personal)": 1.00, "Jamón Adicional (Mediana)": 1.50, "Jamón Adicional (Familiar)": 2.00,
@@ -89,25 +91,43 @@ MENU = {
         "Tocineta (Calzone)": 1.00, "Salami (Calzone)": 1.00, "Aceitunas Negras (Calzone)": 1.00,
         "Aceitunas Verdes (Calzone)": 1.00, "Champiñones (Calzone)": 1.00, "Maíz (Calzone)": 1.00,
         "Pepperoni (Calzone)": 1.00, "Anchoas (Calzone)": 1.00, "Cebolla (Calzone)": 1.00,
-        "Pimentón (Calzone)": 1.00, "Piña (Calzone)": 1.00, "Caja para llevar (25cm)": 0.50,
-        "Caja para llevar (33cm)": 0.70, "Caja para llevar (40cm)": 0.90,
+        "Pimentón (Calzone)": 1.00, "Piña (Calzone)": 1.00, "Caja para llevar (25cm)": 0.70,
+        "Caja para llevar (33cm)": 0.90, "Caja para llevar (40cm)": 1.00,
     },
     "Bebidas": {
         "Refresco 1.5lts": 2.50,
         "Refresco 335ml": 1.50,
         "Refresco de Lata": 2.00,
-        "Té Verde (tomar aquí)": 2.00,
-        "Té Verde (Para llevar)": 2.80,
-        "Té Negro (tomar aqui)": 2.00,
-        "Té Negro (Para llevar)": 2.80,
-        "Flor de Jamaica (Tomar aquí)": 2.00,
-        "Flor de Jamaica (Para llevar)": 2.80,
-        "Té Matcha (Tomar aquí)": 3.00,
+        "Té Verde (tomar aquí)": 3.00,
+        "Té Verde (Para llevar)": 3.80,
+        "Té Negro (tomar aqui)": 3.00,
+        "Té Negro (Para llevar)": 3.80,
+        "Flor de Jamaica (Tomar aquí)": 3.00,
+        "Flor de Jamaica (Para llevar)": 3.80,
+        "Té Matcha (Tomar aquí)": 4.00,
         "Agua Pequeña (330ml)": 0.5,
         "Agua Mediana (600ml)": 1,
-        "Té Matcha (Para llevar)": 3.80,
+        "Té Matcha (Para llevar)": 4.80,
     }
 }
+
+# Categorías donde al tocar una pizza se abre el flujo rápido (extras mismo tamaño)
+PIZZA_QUICK_ADD_CATEGORIES = ("Pizzas Tradicionales", "Pizzas Especiales")
+
+# Pestañas del menú (móvil): agrupa categorías para menos scroll
+MENU_TAB_GROUPS = [
+    ("🍕 Pizzas", ["Pizzas Tradicionales", "Pizzas Especiales"]),
+    ("🍝 Otros", ["Otros Platos"]),
+    (
+        "➕ Extras y bebidas",
+        [
+            "Ingredientes Tradicionales (Pizza)",
+            "Ingredientes Premium (Pizza)",
+            "Adicionales Calzone y Empaques",
+            "Bebidas",
+        ],
+    ),
+]
 
 # --- INICIALIZACIÓN DEL ESTADO DE LA SESIÓN ---
 if 'order' not in st.session_state:
@@ -124,6 +144,10 @@ if 'customer_name' not in st.session_state:
     st.session_state.customer_name = ""
 if 'order_type' not in st.session_state:
     st.session_state.order_type = "Para comer aquí"
+if 'pending_pizza' not in st.session_state:
+    st.session_state.pending_pizza = None
+if 'pending_extra_counts' not in st.session_state:
+    st.session_state.pending_extra_counts = {}
 
 
 # --- FUNCIONES PARA API DEL DÓLAR ---
@@ -302,11 +326,11 @@ def show_multicereal_modal():
         else:
             st.success(f"✅ {progress_text} - ¡Listo para confirmar!")
         
-        # Crear columnas para los ingredientes
-        cols = st.columns(4)
+        # Dos columnas: mejor en pantallas pequeñas
+        cols = st.columns(2)
         
         for i, ingredient in enumerate(MULTICEREAL_INGREDIENTS):
-            with cols[i % 4]:
+            with cols[i % 2]:
                 is_selected = ingredient in st.session_state.get('selected_ingredients', [])
                 
                 # Deshabilitar si ya se seleccionaron 2 y este no está seleccionado
@@ -416,11 +440,10 @@ def show_4estaciones_modal():
         else:
             st.success(f"✅ {progress_text} - ¡Listo para confirmar!")
         
-        # Crear columnas para los ingredientes
-        cols = st.columns(4)
+        cols = st.columns(2)
         
         for i, ingredient in enumerate(ESTACIONES_INGREDIENTS):
-            with cols[i % 4]:
+            with cols[i % 2]:
                 is_selected = ingredient in st.session_state.get('selected_estaciones_ingredients', [])
                 
                 # Deshabilitar si ya se seleccionaron 4 y este no está seleccionado
@@ -556,12 +579,16 @@ def get_size_emoji(item_name):
 def add_to_order(item_name):
     # Verificar si es una pizza multicereal Y no es un item ya personalizado
     if "multicereal" in item_name.lower() and "(con " not in item_name:
+        st.session_state.pending_pizza = None
+        st.session_state.pending_extra_counts = {}
         # Activar el modal para seleccionar ingredientes
         st.session_state.show_multicereal_modal = True
         st.session_state.multicereal_item = item_name
         st.session_state.selected_ingredients = []
     # Verificar si es una pizza 4 estaciones Y no es un item ya personalizado
     elif "4 estaciones" in item_name.lower() and "(con " not in item_name:
+        st.session_state.pending_pizza = None
+        st.session_state.pending_extra_counts = {}
         # Activar el modal para seleccionar ingredientes
         st.session_state.show_4estaciones_modal = True
         st.session_state.estaciones_item = item_name
@@ -569,11 +596,184 @@ def add_to_order(item_name):
     else:
         st.session_state.order[item_name] += 1
 
+
+def start_pizza_order(item_name):
+    """Pizzas tradicionales/especiales: abre panel de extras; multicereal y 4 estaciones siguen con modal."""
+    if ("multicereal" in item_name.lower() or "4 estaciones" in item_name.lower()) and "(con " not in item_name.lower():
+        add_to_order(item_name)
+        return
+    st.session_state.pending_pizza = item_name
+    st.session_state.pending_extra_counts = {}
+
+
+def pizza_order_size_label(item_name):
+    """Personal / Mediana / Familiar para cruzar con precios de ingredientes adicionales."""
+    n = item_name.lower()
+    if "personal" in n or "25cm" in n:
+        return "Personal"
+    if "mediana" in n or "33cm" in n or "35cm" in n:
+        return "Mediana"
+    if "familiar" in n or "40cm" in n:
+        return "Familiar"
+    return None
+
+
+def menu_items_for_size(category_key, size_label):
+    if not size_label or category_key not in MENU:
+        return []
+    return [(k, v) for k, v in MENU[category_key].items() if k.endswith(f"({size_label})")]
+
+
+def short_ingredient_menu_label(full_key):
+    if " Adicional (" in full_key:
+        return full_key.split(" Adicional (")[0]
+    return full_key
+
+
+def cancel_pending_pizza():
+    st.session_state.pending_pizza = None
+    st.session_state.pending_extra_counts = {}
+
+
+def confirm_pending_pizza():
+    p = st.session_state.pending_pizza
+    if not p:
+        return
+    st.session_state.order[p] += 1
+    for k, v in st.session_state.pending_extra_counts.items():
+        if v and v > 0:
+            st.session_state.order[k] += v
+    cancel_pending_pizza()
+
+
+def adjust_pending_extra(menu_key, delta):
+    d = st.session_state.pending_extra_counts
+    cur = d.get(menu_key, 0) + delta
+    if cur <= 0:
+        d.pop(menu_key, None)
+    else:
+        d[menu_key] = cur
+
+
+def order_subtotal_usd():
+    total = 0.0
+    for item, qty in st.session_state.order.items():
+        if item == "🚚 Delivery":
+            total += qty
+        else:
+            total += get_item_price(item) * qty
+    return total
+
+
+def render_pizza_quick_panel(show_usd):
+    """Panel fijo al elegir pizza: extras del mismo tamaño sin ir a otra categoría."""
+    pending = st.session_state.get("pending_pizza")
+    if not pending:
+        return
+    size = pizza_order_size_label(pending)
+    menu_flat = {k: v for category in MENU.values() for k, v in category.items()}
+    base_price = menu_flat.get(pending, 0.0)
+    price_txt = format_currency(base_price, show_usd)
+
+    st.subheader("🍕 Completar esta pizza")
+    st.markdown(f"**{pending}** · {price_txt}")
+    if not size:
+        st.warning("No se detectó el tamaño; puedes añadir la pizza sola o cancelar.")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ Solo pizza", type="primary", use_container_width=True, key="pq_solo_nosize"):
+                confirm_pending_pizza()
+        with c2:
+            if st.button("❌ Cancelar", use_container_width=True, key="pq_cancel_nosize"):
+                cancel_pending_pizza()
+        return
+
+    st.caption("Extras opcionales (ya al tamaño de la pizza). Luego confirma para meter todo en el pedido.")
+
+    trad = menu_items_for_size("Ingredientes Tradicionales (Pizza)", size)
+    prem = menu_items_for_size("Ingredientes Premium (Pizza)", size)
+
+    def render_extra_grid(items_list, key_prefix):
+        if not items_list:
+            return
+        cols = st.columns(2)
+        for i, (fk, pr) in enumerate(items_list):
+            with cols[i % 2]:
+                cnt = st.session_state.pending_extra_counts.get(fk, 0)
+                label = short_ingredient_menu_label(fk)
+                extra_price = format_currency(pr, show_usd) if show_usd else f"${pr:.2f}"
+                b0, b1, b2 = st.columns([1, 2.2, 1])
+                with b0:
+                    if st.button("−", key=f"{key_prefix}_m_{i}", use_container_width=True, disabled=cnt <= 0):
+                        adjust_pending_extra(fk, -1)
+                with b1:
+                    st.markdown(
+                        f"<div style='text-align:center;line-height:1.25;padding:6px 0'><b>{label}</b><br>"
+                        f"<small>{extra_price}</small><br><span style='font-size:1.1rem'>{cnt}×</span></div>",
+                        unsafe_allow_html=True,
+                    )
+                with b2:
+                    if st.button("+", key=f"{key_prefix}_p_{i}", use_container_width=True):
+                        adjust_pending_extra(fk, 1)
+
+    st.markdown("**Tradicionales**")
+    render_extra_grid(trad, "pqt")
+    st.markdown("**Premium**")
+    render_extra_grid(prem, "pqp")
+
+    st.markdown("---")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("✅ Añadir pizza al pedido", type="primary", use_container_width=True, key="pq_confirm"):
+            confirm_pending_pizza()
+    with c2:
+        if st.button("❌ Cancelar", use_container_width=True, key="pq_cancel"):
+            cancel_pending_pizza()
+
 def remove_from_order(item_name):
     if st.session_state.order[item_name] > 0:
         st.session_state.order[item_name] -= 1
         if st.session_state.order[item_name] == 0:
             del st.session_state.order[item_name]
+
+
+def render_menu_item_row(category, item_name, price, *, show_usd):
+    """Una fila del menú: botones grandes; pizzas con flujo de extras rápido."""
+    use_small_buttons = "Ingredientes" in category or "Adicionales Calzone" in category
+    use_pizza_flow = category in PIZZA_QUICK_ADD_CATEGORIES
+    size_emoji = get_size_emoji(item_name)
+
+    if use_small_buttons:
+        if " Adicional (" in item_name:
+            base_name = item_name.split(" Adicional (")[0]
+            size_part = item_name.split("(")[1].split(")")[0]
+            size_letter = size_part[0].upper()
+            display_name = f"{base_name} ({size_letter})"
+        else:
+            parts = item_name.split(" Adicional ")
+            display_name = parts[0]
+            if len(parts) > 1:
+                size_letter = parts[1][0].lower()
+                display_name += f" ({size_letter})"
+            else:
+                display_name = item_name
+        if size_emoji:
+            display_name = f"{size_emoji} {display_name}"
+        b_col1, b_col2 = st.columns([0.7, 0.3])
+        with b_col1:
+            st.button(display_name, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
+        with b_col2:
+            price_text = format_currency(price, show_usd)
+            st.markdown(f"**{price_text}**", help=f"Precio: {format_currency(price, True)}")
+    else:
+        price_text = format_currency(price, show_usd)
+        button_text = f"{size_emoji} {item_name}" if size_emoji else item_name
+        button_label = f"{button_text} — {price_text}"
+        if use_pizza_flow:
+            st.button(button_label, key=item_name, on_click=start_pizza_order, args=(item_name,), use_container_width=True)
+        else:
+            st.button(button_label, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
+
 
 def format_order_text():
     if not st.session_state.order:
@@ -1088,52 +1288,78 @@ def print_to_system_printer(content, printer_name=None):
         return False, f"Error al imprimir: {str(e)}"
 
 # --- INTERFAZ DE USUARIO ---
+st.markdown(
+    """
+<style>
+    .block-container { padding-top: 0.75rem !important; padding-bottom: 2rem !important; max-width: 42rem; }
+    button[kind="secondary"], button[kind="primary"] {
+        min-height: 2.75rem !important;
+        font-size: 1rem !important;
+    }
+    div[data-testid="stSidebarNav"] { font-size: 1rem; }
+</style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("🍕 Pedidos whatsapp")
-st.write("Selecciona los productos del menú para agregarlos al pedido.")
+st.caption("Menú pensado para móvil: elige una pizza y añade extras en el mismo paso. Menú ☰ para pedido completo, cliente e impresión.")
 
 # Mostrar modales si están activos
 show_multicereal_modal()
 show_4estaciones_modal()
 
 # --- INFORMACIÓN DEL DÓLAR ---
-col1, col2, col3 = st.columns([2, 1, 1])
-with col1:
-    if 'dollar_rate' not in st.session_state:
-        # Primero intentar fuentes directas del BCV
-        rate, source = get_bcv_rate_direct()
-        if rate:
-            st.session_state.dollar_rate, st.session_state.api_source = rate, source
-        else:
-            st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
-    st.info(f"💱 Dólar BCV: Bs. {st.session_state.dollar_rate:,.2f}")
-with col2:
-    if st.button("🔄 Actualizar BCV"):
+if "dollar_rate" not in st.session_state:
+    rate, source = get_bcv_rate_direct()
+    if rate:
+        st.session_state.dollar_rate, st.session_state.api_source = rate, source
+    else:
+        st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
+
+st.info(f"💱 Dólar BCV: Bs. {st.session_state.dollar_rate:,.2f}")
+bc1, bc2 = st.columns(2)
+with bc1:
+    if st.button("🔄 Actualizar BCV", use_container_width=True):
         st.cache_data.clear()
-        # Primero intentar fuentes directas del BCV
         rate, source = get_bcv_rate_direct()
         if rate:
             st.session_state.dollar_rate, st.session_state.api_source = rate, source
         else:
             st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
         st.success(f"Tasa actualizada: Bs. {st.session_state.dollar_rate:,.2f}")
-with col3:
+with bc2:
     show_usd = st.checkbox("Mostrar USD", value=True)
 
-
-
 # --- BUSCADOR ---
-col_search, col_clear = st.columns([4, 1])
-with col_search:
-    search_term = st.text_input("🔍 Buscar pizzas o ingredientes:", placeholder="Ej: margherita, jamón, tocineta, personal, familiar...")
-with col_clear:
-    st.write("")  # Espaciado
-    if st.button("🗑️ Limpiar"):
+bs1, bs2 = st.columns([5, 1])
+with bs1:
+    search_term = st.text_input(
+        "🔍 Buscar en el menú",
+        placeholder="Ej: margherita, jamón, personal, familiar, té…",
+        key="menu_search_key",
+    )
+with bs2:
+    st.write("")  # alinea con el campo
+    if st.button("Limpiar", use_container_width=True, key="menu_search_clear"):
+        st.session_state.menu_search_key = ""
         st.rerun()
 
-
+n_lines = sum(st.session_state.order.values()) if st.session_state.order else 0
+with st.expander(f"🛒 Resumen del pedido ({n_lines} líneas)", expanded=n_lines > 0):
+    if not st.session_state.order:
+        st.caption("Vacío. Usa el menú lateral ☰ para nombre del cliente, empaques, delivery e impresión.")
+    else:
+        for item, qty in sorted(st.session_state.order.items()):
+            em = get_size_emoji(item)
+            label = f"{em} {item}" if em else item
+            st.markdown(f"**{qty}×** {label}")
+        sub = order_subtotal_usd()
+        bs = sub * st.session_state.dollar_rate
+        st.markdown(f"**Subtotal aprox.:** ${sub:.2f} USD · Bs. {bs:,.2f}")
 
 # --- LEYENDA DE TAMAÑOS ---
-st.markdown("**Leyenda de tamaños:** 🟢 Personal (25cm) | ⚪ Mediana (33cm) | 🔴 Familiar (40cm)")
+st.markdown("**Tamaños:** 🟢 Personal (25cm) · ⚪ Mediana (33cm) · 🔴 Familiar (40cm)")
 
 with st.sidebar:
     # --- INFORMACIÓN DEL CLIENTE ---
@@ -1192,15 +1418,15 @@ with st.sidebar:
         st.subheader("📦 Empaques")
         
         st.markdown("<small>Caja Personal (25cm)</small>", unsafe_allow_html=True)
-        if st.button("$0.50", key="caja_personal", use_container_width=True):
+        if st.button("$0.70", key="caja_personal", use_container_width=True):
             st.session_state.order["Caja para llevar (25cm)"] += 1
         
         st.markdown("<small>Caja Mediana (33cm)</small>", unsafe_allow_html=True)
-        if st.button("$0.70", key="caja_mediana", use_container_width=True):
+        if st.button("$0.90", key="caja_mediana", use_container_width=True):
             st.session_state.order["Caja para llevar (33cm)"] += 1
         
         st.markdown("<small>Caja Familiar (40cm)</small>", unsafe_allow_html=True)
-        if st.button("$0.90", key="caja_familiar", use_container_width=True):
+        if st.button("$1.00", key="caja_familiar", use_container_width=True):
             st.session_state.order["Caja para llevar (40cm)"] += 1
         
         # Botón para quitar empaques
@@ -1372,71 +1598,39 @@ with st.sidebar:
         st.session_state.order.clear()
         st.session_state.customer_name = ""
         st.session_state.order_type = "Para comer aquí"
+        cancel_pending_pizza()
 
 # --- MENÚ PRINCIPAL ---
-# Aplicar filtro de búsqueda
 filtered_menu = filter_menu_items(MENU, search_term)
 results_count = get_search_results_count(MENU, search_term)
 
-# Mostrar información de búsqueda
 if search_term:
     if results_count > 0:
-        st.success(f"🔍 Se encontraron {results_count} resultados para '{search_term}'")
+        st.success(f"Resultados: {results_count} para «{search_term}»")
     else:
-        st.warning(f"🔍 No se encontraron resultados para '{search_term}'. Intenta con otros términos.")
+        st.warning(f"Sin resultados para «{search_term}».")
         st.stop()
 
-menu_categories = list(filtered_menu.items())
-all_cols = st.columns(3)
-col_index = 0
+render_pizza_quick_panel(show_usd)
 
-for category, items in menu_categories:
-    with all_cols[col_index % 3]:
-        st.subheader(category)
-        use_small_buttons = "Ingredientes" in category or "Adicionales Calzone" in category
-        
+st.subheader("Menú")
+
+if not search_term:
+    tab_labels = [label for label, _ in MENU_TAB_GROUPS]
+    tabs = st.tabs(tab_labels)
+    for tab_idx, tab in enumerate(tabs):
+        with tab:
+            _, group_cats = MENU_TAB_GROUPS[tab_idx]
+            for cat in group_cats:
+                if cat not in filtered_menu:
+                    continue
+                st.markdown(f"#### {cat}")
+                for item_name, price in filtered_menu[cat].items():
+                    render_menu_item_row(cat, item_name, price, show_usd=show_usd)
+                st.markdown("")
+else:
+    for category, items in filtered_menu.items():
+        st.markdown(f"#### {category}")
         for item_name, price in items.items():
-            # Obtener emoji de tamaño
-            size_emoji = get_size_emoji(item_name)
-            
-            if use_small_buttons:
-                # Procesar ingredientes para mostrar formato corto
-                if " Adicional (" in item_name:
-                    # Para ingredientes como "Maíz Adicional (Personal)"
-                    base_name = item_name.split(" Adicional (")[0]
-                    size_part = item_name.split("(")[1].split(")")[0]
-                    size_letter = size_part[0].upper()  # Usar mayúscula para mejor legibilidad
-                    display_name = f"{base_name} ({size_letter})"
-                else:
-                    # Para otros items como "Tocineta (Calzone)"
-                    parts = item_name.split(" Adicional ")
-                    display_name = parts[0]
-                    if len(parts) > 1:
-                        size_letter = parts[1][0].lower()
-                        display_name += f" ({size_letter})"
-                    else:
-                        display_name = item_name
-                
-                # Agregar emoji al inicio del nombre
-                if size_emoji:
-                    display_name = f"{size_emoji} {display_name}"
-                
-                b_col1, b_col2 = st.columns([0.7, 0.3])
-                with b_col1:
-                    st.button(display_name, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
-                with b_col2:
-                    price_text = format_currency(price, show_usd) if 'show_usd' in locals() else f"${price:.2f}"
-                    st.markdown(f"**{price_text}**", help=f"Precio: {format_currency(price, True)}")
-            else:
-                price_text = format_currency(price, show_usd) if 'show_usd' in locals() else f"${price:.2f}"
-                # Agregar emoji al inicio del nombre del botón
-                button_text = f"{size_emoji} {item_name}" if size_emoji else item_name
-                button_label = f"{button_text} - {price_text}"
-                st.button(button_label, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
-            
-
-            
-    col_index += 1
-    if col_index % 3 == 0:
-        st.markdown("---") # Separador visual entre filas
-        all_cols = st.columns(3)
+            render_menu_item_row(category, item_name, price, show_usd=show_usd)
+        st.markdown("")
