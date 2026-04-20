@@ -701,15 +701,14 @@ def render_pizza_quick_panel(show_usd):
             with cols[i % 2]:
                 cnt = st.session_state.pending_extra_counts.get(fk, 0)
                 label = short_ingredient_menu_label(fk)
-                extra_price = format_currency(pr, show_usd) if show_usd else f"${pr:.2f}"
-                b0, b1, b2 = st.columns([1, 2.2, 1])
+                b0, b1, b2 = st.columns([1, 3.2, 1])
                 with b0:
                     if st.button("−", key=f"{key_prefix}_m_{i}", use_container_width=True, disabled=cnt <= 0):
                         adjust_pending_extra(fk, -1)
                 with b1:
                     st.markdown(
-                        f"<div style='text-align:center;line-height:1.25;padding:6px 0'><b>{label}</b><br>"
-                        f"<small>{extra_price}</small><br><span style='font-size:1.1rem'>{cnt}×</span></div>",
+                        f"<div style='text-align:center;line-height:1.2;padding:6px 0'><b>{label}</b><br>"
+                        f"<span style='font-size:1rem'>{cnt}×</span></div>",
                         unsafe_allow_html=True,
                     )
                 with b2:
@@ -738,13 +737,21 @@ def remove_from_order(item_name):
 
 
 def compact_item_label(item_name):
-    """Etiqueta corta: nombre + tamaño, sin precios ni centímetros."""
+    """Etiqueta corta: nombre + talla breve."""
     if "(" in item_name and ")" in item_name:
         base_name = item_name.split(" (")[0]
         size_raw = item_name.split("(")[1].split(")")[0]
         size_clean = size_raw.replace("25cm", "").replace("33cm", "").replace("35cm", "").replace("40cm", "").replace("20cm", "").strip()
         if size_clean:
-            return f"{base_name} ({size_clean})"
+            size_map = {
+                "Personal": "P",
+                "Mediana": "M",
+                "Familiar": "F",
+                "Comer aquí": "Aquí",
+                "Para llevar": "Llevar",
+            }
+            short_size = size_map.get(size_clean, size_clean)
+            return f"{base_name} ({short_size})"
     return item_name
 
 
@@ -768,9 +775,15 @@ def render_menu_item_row(category, item_name, price, *, show_usd):
                 display_name += f" ({size_letter})"
             else:
                 display_name = item_name
-        if size_emoji:
-            display_name = f"{size_emoji} {display_name}"
-        st.button(display_name, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
+        count = st.session_state.order.get(item_name, 0)
+        c1, c2, c3 = st.columns([1, 3.8, 1])
+        with c1:
+            st.button("−", key=f"minus_{item_name}", on_click=remove_from_order, args=(item_name,), use_container_width=True, disabled=count == 0)
+        with c2:
+            display_text = f"{display_name} · {count}" if count > 0 else display_name
+            st.markdown(f"<div style='text-align:center;padding-top:0.25rem;padding-bottom:0.25rem'><small><b>{display_text}</b></small></div>", unsafe_allow_html=True)
+        with c3:
+            st.button("+", key=f"plus_{item_name}", on_click=add_to_order, args=(item_name,), use_container_width=True)
     else:
         short_name = compact_item_label(item_name)
         button_label = f"{size_emoji} {short_name}" if size_emoji else short_name
@@ -1306,8 +1319,8 @@ st.markdown(
 <style>
     .block-container { padding-top: 0.75rem !important; padding-bottom: 2rem !important; max-width: 42rem; }
     button[kind="secondary"], button[kind="primary"] {
-        min-height: 2.75rem !important;
-        font-size: 1rem !important;
+        min-height: 2.1rem !important;
+        font-size: 0.92rem !important;
     }
     div[data-testid="stSidebarNav"] { font-size: 1rem; }
 </style>
