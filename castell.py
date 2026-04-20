@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 from collections import Counter
 import requests
 import os
@@ -319,12 +319,13 @@ def show_multicereal_modal():
         
         # Mostrar progreso
         progress_text = f"Ingredientes seleccionados: {selected_count}/2"
+        st.progress(min(selected_count / 2.0, 1.0))
         if selected_count == 0:
-            st.warning(f"⚠️ {progress_text} - Selecciona 2 ingredientes")
+            st.warning(f"⚠️ {progress_text}")
         elif selected_count == 1:
-            st.info(f"ℹ️ {progress_text} - Selecciona 1 ingrediente más")
+            st.info(f"ℹ️ {progress_text}")
         else:
-            st.success(f"✅ {progress_text} - ¡Listo para confirmar!")
+            st.success(f"✅ {progress_text}")
         
         # Dos columnas: mejor en pantallas pequeñas
         cols = st.columns(2)
@@ -432,13 +433,14 @@ def show_4estaciones_modal():
         
         # Mostrar progreso
         progress_text = f"Ingredientes seleccionados: {selected_count}/4"
+        st.progress(min(selected_count / 4.0, 1.0))
         if selected_count == 0:
-            st.warning(f"⚠️ {progress_text} - Selecciona 4 ingredientes")
+            st.warning(f"⚠️ {progress_text}")
         elif selected_count < 4:
             remaining = 4 - selected_count
-            st.info(f"ℹ️ {progress_text} - Selecciona {remaining} ingrediente{'s' if remaining > 1 else ''} más")
+            st.info(f"ℹ️ {progress_text} (faltan {remaining})")
         else:
-            st.success(f"✅ {progress_text} - ¡Listo para confirmar!")
+            st.success(f"✅ {progress_text}")
         
         cols = st.columns(2)
         
@@ -655,6 +657,23 @@ def adjust_pending_extra(menu_key, delta):
         d[menu_key] = cur
 
 
+def toggle_pending_extra(menu_key):
+    """Toque rápido en móvil: activa/desactiva un extra para la pizza en edición."""
+    cur = st.session_state.pending_extra_counts.get(menu_key, 0)
+    if cur > 0:
+        st.session_state.pending_extra_counts.pop(menu_key, None)
+    else:
+        st.session_state.pending_extra_counts[menu_key] = 1
+
+
+def toggle_order_item(item_name):
+    """Toque rápido para ingredientes sueltos: agrega si no existe, quita una unidad si ya existe."""
+    if st.session_state.order.get(item_name, 0) > 0:
+        remove_from_order(item_name)
+    else:
+        add_to_order(item_name)
+
+
 def order_subtotal_usd():
     total = 0.0
     for item, qty in st.session_state.order.items():
@@ -665,18 +684,15 @@ def order_subtotal_usd():
     return total
 
 
-def render_pizza_quick_panel(show_usd):
-    """Panel fijo al elegir pizza: extras del mismo tamaño sin ir a otra categoría."""
+def render_pizza_quick_panel():
+    """Panel al elegir pizza: extras del mismo tamaño (sin precios en pantalla)."""
     pending = st.session_state.get("pending_pizza")
     if not pending:
         return
     size = pizza_order_size_label(pending)
-    menu_flat = {k: v for category in MENU.values() for k, v in category.items()}
-    base_price = menu_flat.get(pending, 0.0)
-    price_txt = format_currency(base_price, show_usd)
 
     st.subheader("🍕 Completar esta pizza")
-    st.markdown(f"**{pending}** · {price_txt}")
+    st.markdown(f"**{compact_item_label(pending)}**")
     if not size:
         st.warning("No se detectó el tamaño; puedes añadir la pizza sola o cancelar.")
         c1, c2 = st.columns(2)
@@ -699,18 +715,16 @@ def render_pizza_quick_panel(show_usd):
         cols = st.columns(3)
         for i, (fk, pr) in enumerate(items_list):
             with cols[i % 3]:
-                cnt = st.session_state.pending_extra_counts.get(fk, 0)
                 label = short_ingredient_menu_label(fk)
-                st.markdown(f"<div style='text-align:center;line-height:1.1;min-height:2.1rem'><small><b>{label}</b></small></div>", unsafe_allow_html=True)
-                b0, b1, b2 = st.columns([1, 1.1, 1])
-                with b0:
-                    if st.button("−", key=f"{key_prefix}_m_{i}", use_container_width=True, disabled=cnt <= 0):
-                        adjust_pending_extra(fk, -1)
-                with b1:
-                    st.markdown(f"<div style='text-align:center;padding-top:0.2rem'><b>{cnt}×</b></div>", unsafe_allow_html=True)
-                with b2:
-                    if st.button("+", key=f"{key_prefix}_p_{i}", use_container_width=True):
-                        adjust_pending_extra(fk, 1)
+                is_on = st.session_state.pending_extra_counts.get(fk, 0) > 0
+                btn_label = f"✅ {label}" if is_on else label
+                st.button(
+                    btn_label,
+                    key=f"{key_prefix}_t_{i}",
+                    use_container_width=True,
+                    on_click=toggle_pending_extra,
+                    args=(fk,),
+                )
 
     st.markdown("**Tradicionales**")
     render_extra_grid(trad, "pqt")
@@ -773,14 +787,14 @@ def render_menu_item_row(category, item_name, price, *, show_usd):
             else:
                 display_name = item_name
         count = st.session_state.order.get(item_name, 0)
-        c1, c2, c3 = st.columns([1, 2.2, 1])
-        with c1:
-            st.button("−", key=f"minus_{item_name}", on_click=remove_from_order, args=(item_name,), use_container_width=True, disabled=count == 0)
-        with c2:
-            display_text = f"{display_name} · {count}" if count > 0 else display_name
-            st.markdown(f"<div style='text-align:center;padding-top:0.25rem;padding-bottom:0.25rem'><small><b>{display_text}</b></small></div>", unsafe_allow_html=True)
-        with c3:
-            st.button("+", key=f"plus_{item_name}", on_click=add_to_order, args=(item_name,), use_container_width=True)
+        btn_label = f"✅ {display_name}" if count > 0 else display_name
+        st.button(
+            btn_label,
+            key=f"toggle_{item_name}",
+            on_click=toggle_order_item,
+            args=(item_name,),
+            use_container_width=True,
+        )
     else:
         short_name = compact_item_label(item_name)
         button_label = f"{size_emoji} {short_name}" if size_emoji else short_name
@@ -1310,194 +1324,23 @@ def print_to_system_printer(content, printer_name=None):
     except Exception as e:
         return False, f"Error al imprimir: {str(e)}"
 
-# --- INTERFAZ DE USUARIO ---
-st.markdown(
-    """
-<style>
-    .block-container { padding-top: 0.75rem !important; padding-bottom: 2rem !important; max-width: 42rem; }
-    button[kind="secondary"], button[kind="primary"] {
-        min-height: 1.75rem !important;
-        font-size: 0.88rem !important;
-    }
-    div[data-testid="stSidebarNav"] { font-size: 1rem; }
-</style>
-    """,
-    unsafe_allow_html=True,
-)
 
-st.title("🍕 Pedidos whatsapp")
-st.caption("Menú pensado para móvil: elige una pizza y añade extras en el mismo paso. Menú ☰ para pedido completo, cliente e impresión.")
+def _nav_pedido():
+    st.session_state.castell_nav = "Pedido"
 
-# Mostrar modales si están activos
-show_multicereal_modal()
-show_4estaciones_modal()
 
-# --- INFORMACIÓN DEL DÓLAR ---
-if "dollar_rate" not in st.session_state:
-    rate, source = get_bcv_rate_direct()
-    if rate:
-        st.session_state.dollar_rate, st.session_state.api_source = rate, source
-    else:
-        st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
-
-st.info(f"💱 Dólar BCV: Bs. {st.session_state.dollar_rate:,.2f}")
-bc1, bc2 = st.columns(2)
-with bc1:
-    if st.button("🔄 Actualizar BCV", use_container_width=True):
-        st.cache_data.clear()
-        rate, source = get_bcv_rate_direct()
-        if rate:
-            st.session_state.dollar_rate, st.session_state.api_source = rate, source
-        else:
-            st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
-        st.success(f"Tasa actualizada: Bs. {st.session_state.dollar_rate:,.2f}")
-with bc2:
-    show_usd = st.checkbox("Mostrar USD", value=True)
-
-# --- BUSCADOR ---
-bs1, bs2 = st.columns([5, 1])
-with bs1:
-    search_term = st.text_input(
-        "🔍 Buscar en el menú",
-        placeholder="Ej: margherita, jamón, personal, familiar, té…",
-        key="menu_search_key",
-    )
-with bs2:
-    st.write("")  # alinea con el campo
-    if st.button("Limpiar", use_container_width=True, key="menu_search_clear"):
-        st.session_state.menu_search_key = ""
-        st.rerun()
-
-n_lines = sum(st.session_state.order.values()) if st.session_state.order else 0
-with st.expander(f"🛒 Resumen del pedido ({n_lines} líneas)", expanded=n_lines > 0):
-    if not st.session_state.order:
-        st.caption("Vacío. Usa el menú lateral ☰ para nombre del cliente, empaques, delivery e impresión.")
-    else:
-        for item, qty in sorted(st.session_state.order.items()):
-            em = get_size_emoji(item)
-            label = f"{em} {item}" if em else item
-            st.markdown(f"**{qty}×** {label}")
-        sub = order_subtotal_usd()
-        bs = sub * st.session_state.dollar_rate
-        st.markdown(f"**Subtotal aprox.:** ${sub:.2f} USD · Bs. {bs:,.2f}")
-
-# --- LEYENDA DE TAMAÑOS ---
-st.markdown("**Tamaños:** 🟢 Personal (25cm) · ⚪ Mediana (33cm) · 🔴 Familiar (40cm)")
-
-with st.sidebar:
-    # --- INFORMACIÓN DEL CLIENTE ---
-    st.header("👤 Información del Cliente")
-    
-    # Campo para el nombre del cliente
-    customer_name = st.text_input("Nombre del cliente:", value=st.session_state.customer_name, placeholder="Ej: Juan Pérez")
-    if customer_name != st.session_state.customer_name:
-        st.session_state.customer_name = customer_name
-    
-    # Botones para tipo de pedido
-    st.subheader("📍 Tipo de Pedido")
-    
-    if st.button("🍽️ Comer aquí", use_container_width=True, 
-                 type="primary" if st.session_state.order_type == "Para comer aquí" else "secondary"):
-        st.session_state.order_type = "Para comer aquí"
-    
-    if st.button("🥡 Pickup", use_container_width=True,
-                 type="primary" if st.session_state.order_type == "Para llevar (PICKUP)" else "secondary"):
-        st.session_state.order_type = "Para llevar (PICKUP)"
-    
-    if st.button("🚚 Delivery", use_container_width=True,
-                 type="primary" if st.session_state.order_type == "Para llevar (DELIVERY)" else "secondary"):
-        st.session_state.order_type = "Para llevar (DELIVERY)"
-    
-    # Mostrar selección actual
-    st.info(f"**Cliente:** {st.session_state.customer_name or 'Sin nombre'}")
-    st.info(f"**Tipo:** {st.session_state.order_type}")
-    
-    st.markdown("---")
-    
-    st.header("🛒 Pedido Actual")
-    if not st.session_state.order:
-        st.info("El pedido está vacío.")
-    else:
-        sorted_order_items = sorted(st.session_state.order.items())
-        for item, quantity in sorted_order_items:
-            # Agregar emoji al pedido en el sidebar
-            size_emoji = get_size_emoji(item)
-            item_with_emoji = f"{size_emoji} {item}" if size_emoji else item
-            st.write(f"{quantity}x {item_with_emoji}")
-            
-            # Botones de agregar y quitar en líneas separadas
-            if st.button(f"➕ Agregar {item}", key=f"add_{item}", use_container_width=True):
-                add_to_order(item)
-            if st.button(f"➖ Quitar {item}", key=f"rem_{item}", use_container_width=True):
-                remove_from_order(item)
-            st.markdown("---")
-        st.markdown("---")
-        order_text, subtotal = format_order_text()
-        st.subheader("📝 Texto para Copiar")
-        st.text_area("Pedido para WhatsApp", value=order_text, height=300)
-        
-
-        # Sección de Empaques
-        st.subheader("📦 Empaques")
-        
-        st.markdown("<small>Caja Personal (25cm)</small>", unsafe_allow_html=True)
-        if st.button("$0.70", key="caja_personal", use_container_width=True):
-            st.session_state.order["Caja para llevar (25cm)"] += 1
-        
-        st.markdown("<small>Caja Mediana (33cm)</small>", unsafe_allow_html=True)
-        if st.button("$0.90", key="caja_mediana", use_container_width=True):
-            st.session_state.order["Caja para llevar (33cm)"] += 1
-        
-        st.markdown("<small>Caja Familiar (40cm)</small>", unsafe_allow_html=True)
-        if st.button("$1.00", key="caja_familiar", use_container_width=True):
-            st.session_state.order["Caja para llevar (40cm)"] += 1
-        
-        # Botón para quitar empaques
-        empaque_items = [item for item in st.session_state.order.keys() if "Caja para llevar" in item]
-        if empaque_items:
-            if st.button("❌ Quitar Empaques", use_container_width=True):
-                for item in empaque_items:
-                    del st.session_state.order[item]
-        
-        # Botones de Delivery
-        st.subheader("🚚 Delivery")
-        
-        st.markdown("<small>0km - 3km</small>", unsafe_allow_html=True)
-        if st.button("$1.50", key="delivery_1_5", use_container_width=True):
-            st.session_state.order["🚚 Delivery"] = 1.50
-        
-        st.markdown("<small>3.1km - 6km</small>", unsafe_allow_html=True)
-        if st.button("$2.50", key="delivery_2_5", use_container_width=True):
-            st.session_state.order["🚚 Delivery"] = 2.50
-        
-        st.markdown("<small>6.1km - 8.5km</small>", unsafe_allow_html=True)
-        if st.button("$3.50", key="delivery_3_5", use_container_width=True):
-            st.session_state.order["🚚 Delivery"] = 3.50
-        
-        st.markdown("<small>8.6km - 10km</small>", unsafe_allow_html=True)
-        if st.button("$4.50", key="delivery_4_5", use_container_width=True):
-            st.session_state.order["🚚 Delivery"] = 4.50
-        
-        # Botón para quitar delivery
-        if "🚚 Delivery" in st.session_state.order:
-            if st.button("❌ Quitar Delivery", use_container_width=True):
-                del st.session_state.order["🚚 Delivery"]
-        
-        # Botones de impresión
-        st.subheader("🖨️ Impresión 80mm")
-        
-        if st.button("💰 Imprimir Ticket Barra", use_container_width=True, help="Ticket con precios para la barra"):
-            # Generar contenido del ticket de barra
-            bar_content = format_bar_ticket_58mm()
-            
-            # Abrir directamente el diálogo de impresión
-            st.components.v1.html(f"""
+def render_print_ticket_buttons(key_suffix=""):
+    """Botones de impresión térmica / navegador (mismo bloque que antes)."""
+    ks = key_suffix
+    if st.button("💰 Ticket barra", use_container_width=True, key=f"print_barra{ks}", help="Ticket con precios para la barra"):
+        bar_content = format_bar_ticket_58mm()
+        st.components.v1.html(f"""
             <div id="printContent" style="
-                font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace; 
-                font-size: 11px; 
+                font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace;
+                font-size: 11px;
                 font-weight: normal;
-                line-height: 1.2; 
-                white-space: pre-wrap; 
+                line-height: 1.2;
+                white-space: pre-wrap;
                 color: #333333;
                 padding: 10px;
                 border: 1px solid #ccc;
@@ -1506,63 +1349,38 @@ with st.sidebar:
             ">
 {bar_content}
             </div>
-            
             <style>
                 @media print {{
-                    body * {{
-                        visibility: hidden !important;
-                    }}
-                    #printContent, #printContent * {{
-                        visibility: visible !important;
-                        display: block !important;
-                    }}
+                    body * {{ visibility: hidden !important; }}
+                    #printContent, #printContent * {{ visibility: visible !important; display: block !important; }}
                     #printContent {{
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 80mm !important;
-                        font-size: 16px !important;
-                        font-weight: 900 !important;
+                        position: absolute !important; left: 0 !important; top: 0 !important;
+                        width: 80mm !important; font-size: 16px !important; font-weight: 900 !important;
                         color: #000000 !important;
                         font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace !important;
-                        text-shadow: 1px 1px 0px #000000 !important;
                         white-space: pre-wrap !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
-                        background: white !important;
-                        padding: 2mm !important;
-                        margin: 0 !important;
-                        border: none !important;
-                        line-height: 1.3 !important;
-                        letter-spacing: 0.5px !important;
+                        background: white !important; padding: 2mm !important; margin: 0 !important;
+                        border: none !important; line-height: 1.3 !important; letter-spacing: 0.5px !important;
                     }}
-                    @page {{
-                        size: 80mm auto;
-                        margin: 2mm;
-                    }}
+                    @page {{ size: 80mm auto; margin: 2mm; }}
                 }}
             </style>
-            
             <script>
-                // Abrir diálogo de impresión inmediatamente
-                setTimeout(function() {{
-                    window.print();
-                }}, 300);
+                setTimeout(function() {{ window.print(); }}, 300);
             </script>
             """, height=200)
-        
-        if st.button("👨‍🍳 Imprimir Ticket Cocina", use_container_width=True, help="Ticket sin precios para la cocina"):
-            # Generar contenido del ticket de cocina
-            kitchen_content = format_kitchen_ticket_58mm()
-            
-            # Abrir directamente el diálogo de impresión
-            st.components.v1.html(f"""
+
+    if st.button("👨‍🍳 Ticket cocina", use_container_width=True, key=f"print_cocina{ks}", help="Ticket sin precios para la cocina"):
+        kitchen_content = format_kitchen_ticket_58mm()
+        st.components.v1.html(f"""
             <div id="printContentKitchen" style="
-                font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace; 
-                font-size: 11px; 
+                font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace;
+                font-size: 11px;
                 font-weight: normal;
-                line-height: 1.2; 
-                white-space: pre-wrap; 
+                line-height: 1.2;
+                white-space: pre-wrap;
                 color: #333333;
                 padding: 10px;
                 border: 1px solid #ccc;
@@ -1571,89 +1389,319 @@ with st.sidebar:
             ">
 {kitchen_content}
             </div>
-            
             <style>
                 @media print {{
-                    body * {{
-                        visibility: hidden !important;
-                    }}
-                    #printContentKitchen, #printContentKitchen * {{
-                        visibility: visible !important;
-                        display: block !important;
-                    }}
+                    body * {{ visibility: hidden !important; }}
+                    #printContentKitchen, #printContentKitchen * {{ visibility: visible !important; display: block !important; }}
                     #printContentKitchen {{
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 80mm !important;
-                        font-size: 16px !important;
-                        font-weight: 900 !important;
+                        position: absolute !important; left: 0 !important; top: 0 !important;
+                        width: 80mm !important; font-size: 16px !important; font-weight: 900 !important;
                         color: #000000 !important;
                         font-family: 'Courier New', 'Lucida Console', 'Monaco', monospace !important;
-                        text-shadow: 1px 1px 0px #000000 !important;
                         white-space: pre-wrap !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
-                        background: white !important;
-                        padding: 2mm !important;
-                        margin: 0 !important;
-                        border: none !important;
-                        line-height: 1.3 !important;
-                        letter-spacing: 0.5px !important;
+                        background: white !important; padding: 2mm !important; margin: 0 !important;
+                        border: none !important; line-height: 1.3 !important; letter-spacing: 0.5px !important;
                     }}
-                    @page {{
-                        size: 80mm auto;
-                        margin: 2mm;
-                    }}
+                    @page {{ size: 80mm auto; margin: 2mm; }}
                 }}
             </style>
-            
             <script>
-                // Abrir diálogo de impresión inmediatamente
-                setTimeout(function() {{
-                    window.print();
-                }}, 300);
+                setTimeout(function() {{ window.print(); }}, 300);
             </script>
             """, height=200)
 
-    
-    if st.button("🗑️ Reiniciar Pedido", use_container_width=True):
+
+# --- INTERFAZ DE USUARIO ---
+CASTELL_CSS = """
+<style>
+    :root {
+        --castell-red: #b22222;
+        --castell-red-dark: #8b0000;
+        --castell-gold: #c9a227;
+        --castell-bg: #f8f8f8;
+        --castell-card: #ffffff;
+    }
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 4.5rem !important;
+        max-width: 28rem !important;
+        background: var(--castell-bg) !important;
+    }
+    h1, h2, h3 { letter-spacing: -0.02em; }
+    div[data-testid="stRadio"] > div { flex-wrap: wrap !important; gap: 0.35rem !important; }
+    div[data-testid="stRadio"] label {
+        border-radius: 999px !important;
+        padding: 0.35rem 0.75rem !important;
+        border: 1px solid #e0e0e0 !important;
+        background: #fff !important;
+    }
+    button[kind="secondary"], button[kind="primary"] {
+        min-height: 2rem !important;
+        font-size: 0.85rem !important;
+        border-radius: 12px !important;
+    }
+    .castell-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0.25rem 0 0.5rem 0; margin-bottom: 0.25rem;
+        border-bottom: 1px solid #eee;
+    }
+    .castell-brand { font-size: 1.15rem; font-weight: 700; color: var(--castell-red); margin: 0; }
+    .castell-sub { font-size: 0.75rem; color: #666; margin-top: 0.15rem; }
+    div[data-testid="stSidebarNav"] { font-size: 0.9rem; }
+</style>
+"""
+st.markdown(CASTELL_CSS, unsafe_allow_html=True)
+
+if "dollar_rate" not in st.session_state:
+    rate, source = get_bcv_rate_direct()
+    if rate:
+        st.session_state.dollar_rate, st.session_state.api_source = rate, source
+    else:
+        st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
+
+if "castell_nav" not in st.session_state:
+    st.session_state.castell_nav = "Menú"
+
+# Cabecera estilo app
+hc1, hc2, hc3 = st.columns([1, 4, 2])
+with hc1:
+    st.caption("☰")
+with hc2:
+    st.markdown('<p class="castell-brand">Castell Pizzas</p><p class="castell-sub">Pedidos rápidos</p>', unsafe_allow_html=True)
+with hc3:
+    show_usd = st.checkbox("USD/Bs", value=True, help="Mostrar montos en USD además de Bs donde aplique")
+
+st.radio(
+    "Vista",
+    ["Menú", "Pedido", "Resumen"],
+    horizontal=True,
+    label_visibility="collapsed",
+    key="castell_nav",
+)
+
+nav = st.session_state.castell_nav
+
+st.markdown("---")
+
+# Modales primero (multicereal / 4 estaciones)
+show_multicereal_modal()
+show_4estaciones_modal()
+
+# --- Contenido por vista ---
+if nav == "Menú":
+    with st.expander("💱 Tasa BCV", expanded=False):
+        st.metric("Bolívares por USD", f"Bs. {st.session_state.dollar_rate:,.2f}")
+        if st.button("🔄 Actualizar tasa", key="bcv_refresh_main"):
+            st.cache_data.clear()
+            rate, source = get_bcv_rate_direct()
+            if rate:
+                st.session_state.dollar_rate, st.session_state.api_source = rate, source
+            else:
+                st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
+            st.success("Tasa actualizada")
+
+    bs1, bs2 = st.columns([5, 1])
+    with bs1:
+        search_term = st.text_input(
+            "Buscar",
+            placeholder="Buscar en el menú…",
+            key="menu_search_key",
+            label_visibility="collapsed",
+        )
+    with bs2:
+        if st.button("✕", key="menu_search_clear", help="Limpiar búsqueda"):
+            st.session_state.menu_search_key = ""
+            st.rerun()
+
+    filtered_menu = filter_menu_items(MENU, search_term)
+    results_count = get_search_results_count(MENU, search_term)
+
+    if search_term:
+        if results_count == 0:
+            st.warning("Sin resultados.")
+            st.stop()
+
+    render_pizza_quick_panel()
+
+    st.markdown("##### Catálogo")
+    st.caption("🟢 P · ⚪ M · 🔴 F")
+
+    section_labels = ["🍕 Pizzas", "🍝 Otros", "➕ Extras"]
+    section_pick = st.radio(
+        "Categoría",
+        section_labels,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="castell_menu_section",
+    )
+    tab_idx = section_labels.index(section_pick)
+    _, group_cats = MENU_TAB_GROUPS[tab_idx]
+
+    if not search_term:
+        visible_cats = [cat for cat in group_cats if cat in filtered_menu]
+        if not visible_cats:
+            st.caption("Sin productos.")
+        else:
+            selected_cat = st.selectbox(
+                "Sección",
+                options=visible_cats,
+                key="mobile_cat_selector_0",
+                label_visibility="collapsed",
+            )
+            grid_cols = 3 if ("Ingredientes" in selected_cat or "Adicionales Calzone" in selected_cat) else 2
+            render_category_grid(selected_cat, filtered_menu[selected_cat], show_usd=show_usd, columns_count=grid_cols)
+    else:
+        for category, items in filtered_menu.items():
+            st.markdown(f"**{category}**")
+            grid_cols = 3 if ("Ingredientes" in category or "Adicionales Calzone" in category) else 2
+            render_category_grid(category, items, show_usd=show_usd, columns_count=grid_cols)
+
+    # Barra tipo checkout (mockup): artículos + subtotal + ir a pedido
+    _n = sum(st.session_state.order.values()) if st.session_state.order else 0
+    _sub = order_subtotal_usd()
+    _bs = _sub * st.session_state.dollar_rate
+    st.markdown("---")
+    f1, f2, f3 = st.columns([2, 2, 2])
+    with f1:
+        st.caption(f"{_n} artículos")
+    with f2:
+        if show_usd:
+            st.markdown(f"**${_sub:.2f}**")
+        else:
+            st.markdown(f"**Bs. {_bs:,.2f}**")
+    with f3:
+        st.button("Pedido →", use_container_width=True, key="dock_pedido", on_click=_nav_pedido)
+
+elif nav == "Pedido":
+    st.markdown("##### Tu pedido")
+    customer_name = st.text_input("Nombre del cliente", value=st.session_state.customer_name, placeholder="Nombre", key="cust_field")
+    if customer_name != st.session_state.customer_name:
+        st.session_state.customer_name = customer_name
+
+    t1, t2, t3 = st.columns(3)
+    with t1:
+        if st.button("Comer aquí", use_container_width=True, type="primary" if st.session_state.order_type == "Para comer aquí" else "secondary"):
+            st.session_state.order_type = "Para comer aquí"
+    with t2:
+        if st.button("Pickup", use_container_width=True, type="primary" if st.session_state.order_type == "Para llevar (PICKUP)" else "secondary"):
+            st.session_state.order_type = "Para llevar (PICKUP)"
+    with t3:
+        if st.button("Delivery", use_container_width=True, type="primary" if st.session_state.order_type == "Para llevar (DELIVERY)" else "secondary"):
+            st.session_state.order_type = "Para llevar (DELIVERY)"
+
+    if st.session_state.order_type == "Para llevar (DELIVERY)":
+        st.caption("Zona de envío")
+        d1, d2 = st.columns(2)
+        with d1:
+            if st.button("0–3 km", use_container_width=True, key="dz1"):
+                st.session_state.order["🚚 Delivery"] = 1.50
+        with d2:
+            if st.button("3–6 km", use_container_width=True, key="dz2"):
+                st.session_state.order["🚚 Delivery"] = 2.50
+        d3, d4 = st.columns(2)
+        with d3:
+            if st.button("6–8.5 km", use_container_width=True, key="dz3"):
+                st.session_state.order["🚚 Delivery"] = 3.50
+        with d4:
+            if st.button("8.6–10 km", use_container_width=True, key="dz4"):
+                st.session_state.order["🚚 Delivery"] = 4.50
+        if "🚚 Delivery" in st.session_state.order:
+            if st.button("Quitar delivery", key="dz_clear"):
+                del st.session_state.order["🚚 Delivery"]
+
+    if not st.session_state.order:
+        st.info("Aún no hay productos. Ve a **Menú** para agregar.")
+    else:
+        st.caption("Ítems")
+        sorted_order_items = sorted(st.session_state.order.items())
+        for item, quantity in sorted_order_items:
+            if item == "🚚 Delivery":
+                st.markdown("**Delivery** — tarifa en subtotal")
+                continue
+            size_emoji = get_size_emoji(item)
+            item_with_emoji = f"{size_emoji} {item}" if size_emoji else item
+            r1, r2, r3, r4 = st.columns([4, 1, 1, 1])
+            with r1:
+                st.markdown(f"{item_with_emoji}")
+            with r2:
+                st.markdown(f"**×{quantity}**")
+            with r3:
+                st.button("−", key=f"rm_{item}", on_click=remove_from_order, args=(item,))
+            with r4:
+                st.button("+", key=f"ad_{item}", on_click=add_to_order, args=(item,))
+
+        st.markdown("##### Empaques")
+        e1, e2, e3 = st.columns(3)
+        with e1:
+            if st.button("Caja P", use_container_width=True, key="bx_p"):
+                st.session_state.order["Caja para llevar (25cm)"] += 1
+        with e2:
+            if st.button("Caja M", use_container_width=True, key="bx_m"):
+                st.session_state.order["Caja para llevar (33cm)"] += 1
+        with e3:
+            if st.button("Caja G", use_container_width=True, key="bx_g"):
+                st.session_state.order["Caja para llevar (40cm)"] += 1
+        empaque_items = [it for it in st.session_state.order.keys() if "Caja para llevar" in it]
+        if empaque_items:
+            if st.button("Quitar cajas", key="bx_all"):
+                for it in empaque_items:
+                    del st.session_state.order[it]
+
+    sub_u = order_subtotal_usd()
+    sub_bs = sub_u * st.session_state.dollar_rate
+    st.markdown("---")
+    if show_usd:
+        st.metric("Subtotal", f"${sub_u:.2f} USD", delta=f"Bs. {sub_bs:,.2f}")
+    else:
+        st.metric("Subtotal", f"Bs. {sub_bs:,.2f}")
+
+    order_text, _ = format_order_text()
+    st.markdown("##### Copiar para WhatsApp")
+    st.text_area("Pedido", value=order_text, height=220, key="wa_text_pedido", label_visibility="collapsed")
+
+    st.markdown("##### Impresión")
+    render_print_ticket_buttons("_pedido")
+
+    if st.button("🗑️ Reiniciar pedido", use_container_width=True, key="reset_pedido"):
         st.session_state.order.clear()
         st.session_state.customer_name = ""
         st.session_state.order_type = "Para comer aquí"
         cancel_pending_pizza()
 
-# --- MENÚ PRINCIPAL ---
-filtered_menu = filter_menu_items(MENU, search_term)
-results_count = get_search_results_count(MENU, search_term)
-
-if search_term:
-    if results_count > 0:
-        st.success(f"Resultados: {results_count} para «{search_term}»")
-    else:
-        st.warning(f"Sin resultados para «{search_term}».")
-        st.stop()
-
-render_pizza_quick_panel(show_usd)
-
-st.subheader("Menú")
-
-if not search_term:
-    tab_labels = [label for label, _ in MENU_TAB_GROUPS]
-    tabs = st.tabs(tab_labels)
-    for tab_idx, tab in enumerate(tabs):
-        with tab:
-            _, group_cats = MENU_TAB_GROUPS[tab_idx]
-            for cat in group_cats:
-                if cat not in filtered_menu:
-                    continue
-                st.markdown(f"#### {cat}")
-                grid_cols = 3 if ("Ingredientes" in cat or "Adicionales Calzone" in cat) else 2
-                render_category_grid(cat, filtered_menu[cat], show_usd=show_usd, columns_count=grid_cols)
-                st.markdown("")
 else:
-    for category, items in filtered_menu.items():
-        st.markdown(f"#### {category}")
-        grid_cols = 3 if ("Ingredientes" in category or "Adicionales Calzone" in category) else 2
-        render_category_grid(category, items, show_usd=show_usd, columns_count=grid_cols)
-        st.markdown("")
+    # Resumen (solo totales y acciones; sin precios por línea)
+    st.markdown("##### Resumen del pedido")
+    st.caption("Revisa y copia o imprime")
+    if not st.session_state.order:
+        st.warning("El pedido está vacío.")
+    else:
+        for item, qty in sorted(st.session_state.order.items()):
+            if item == "🚚 Delivery":
+                st.markdown("- **Delivery** (tarifa según zona)")
+            else:
+                em = get_size_emoji(item)
+                lab = f"{em} {item}" if em else item
+                st.markdown(f"- **{qty}×** {lab}")
+        su = order_subtotal_usd()
+        sbs = su * st.session_state.dollar_rate
+        st.markdown("---")
+        if show_usd:
+            st.metric("Total a pagar", f"${su:.2f} USD")
+            st.caption(f"Equivalente: Bs. {sbs:,.2f} · Tasa BCV Bs. {st.session_state.dollar_rate:,.2f}")
+        else:
+            st.metric("Total a pagar", f"Bs. {sbs:,.2f}")
+
+    ot, _ = format_order_text()
+    st.text_area("Texto WhatsApp", value=ot, height=180, key="wa_text_resumen", label_visibility="collapsed")
+
+    st.markdown("##### Acciones")
+    render_print_ticket_buttons("_resumen")
+
+    if st.button("🗑️ Reiniciar pedido", use_container_width=True, key="reset_resumen"):
+        st.session_state.order.clear()
+        st.session_state.customer_name = ""
+        st.session_state.order_type = "Para comer aquí"
+        cancel_pending_pizza()
+
