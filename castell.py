@@ -1,5 +1,6 @@
 ﻿import streamlit as st
 from collections import Counter
+import hashlib
 import requests
 import os
 import platform
@@ -148,6 +149,10 @@ if 'pending_pizza' not in st.session_state:
     st.session_state.pending_pizza = None
 if 'pending_extra_counts' not in st.session_state:
     st.session_state.pending_extra_counts = {}
+if 'nav_key' not in st.session_state:
+    st.session_state.nav_key = "menu"
+if 'chef_notes' not in st.session_state:
+    st.session_state.chef_notes = ""
 
 
 # --- FUNCIONES PARA API DEL DÓLAR ---
@@ -685,26 +690,34 @@ def order_subtotal_usd():
 
 
 def render_pizza_quick_panel():
-    """Panel al elegir pizza: extras del mismo tamaño (sin precios en pantalla)."""
+    """Panel estilo mockup: armar pizza + extras (2 columnas), sin precios en botones."""
     pending = st.session_state.get("pending_pizza")
     if not pending:
         return
     size = pizza_order_size_label(pending)
 
-    st.subheader("🍕 Completar esta pizza")
-    st.markdown(f"**{compact_item_label(pending)}**")
+    _pn = compact_item_label(pending)
+    st.markdown(
+        f"""
+<div class="pq-hero">
+  <div class="pq-hero-title">Armar pizza</div>
+  <p class="pq-pizza-name">{_pn}</p>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
     if not size:
-        st.warning("No se detectó el tamaño; puedes añadir la pizza sola o cancelar.")
+        st.warning("No se detectó el tamaño.")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("✅ Solo pizza", type="primary", use_container_width=True, key="pq_solo_nosize"):
+            if st.button("Solo pizza", type="primary", use_container_width=True, key="pq_solo_nosize"):
                 confirm_pending_pizza()
         with c2:
-            if st.button("❌ Cancelar", use_container_width=True, key="pq_cancel_nosize"):
+            if st.button("Cancelar", use_container_width=True, key="pq_cancel_nosize"):
                 cancel_pending_pizza()
         return
 
-    st.caption("Extras opcionales (ya al tamaño de la pizza). Luego confirma para meter todo en el pedido.")
+    st.caption("Extras al mismo tamaño. Toca para marcar / desmarcar.")
 
     trad = menu_items_for_size("Ingredientes Tradicionales (Pizza)", size)
     prem = menu_items_for_size("Ingredientes Premium (Pizza)", size)
@@ -712,12 +725,12 @@ def render_pizza_quick_panel():
     def render_extra_grid(items_list, key_prefix):
         if not items_list:
             return
-        cols = st.columns(3)
+        cols = st.columns(2)
         for i, (fk, pr) in enumerate(items_list):
-            with cols[i % 3]:
+            with cols[i % 2]:
                 label = short_ingredient_menu_label(fk)
                 is_on = st.session_state.pending_extra_counts.get(fk, 0) > 0
-                btn_label = f"✅ {label}" if is_on else label
+                btn_label = f"✓ {label}" if is_on else label
                 st.button(
                     btn_label,
                     key=f"{key_prefix}_t_{i}",
@@ -726,18 +739,18 @@ def render_pizza_quick_panel():
                     args=(fk,),
                 )
 
-    st.markdown("**Tradicionales**")
+    st.markdown('<p class="pq-section">Tradicionales</p>', unsafe_allow_html=True)
     render_extra_grid(trad, "pqt")
-    st.markdown("**Premium**")
+    st.markdown('<p class="pq-section">Premium</p>', unsafe_allow_html=True)
     render_extra_grid(prem, "pqp")
 
     st.markdown("---")
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("✅ Añadir pizza al pedido", type="primary", use_container_width=True, key="pq_confirm"):
+        if st.button("Añadir al pedido", type="primary", use_container_width=True, key="pq_confirm"):
             confirm_pending_pizza()
     with c2:
-        if st.button("❌ Cancelar", use_container_width=True, key="pq_cancel"):
+        if st.button("Cancelar", use_container_width=True, key="pq_cancel"):
             cancel_pending_pizza()
 
 def remove_from_order(item_name):
@@ -805,11 +818,22 @@ def render_menu_item_row(category, item_name, price, *, show_usd):
 
 
 def render_category_grid(category, items, *, show_usd, columns_count=2):
-    """Renderiza una categoría en grid compacto para reducir scroll."""
+    """Grid compacto: tarjetas mockup para pizzas/platos/bebidas; toggles para ingredientes."""
+    use_tiles = category in (
+        "Pizzas Tradicionales",
+        "Pizzas Especiales",
+        "Otros Platos",
+        "Bebidas",
+    )
+    if not use_tiles:
+        columns_count = max(columns_count, 3)
     cols = st.columns(columns_count)
     for idx, (item_name, price) in enumerate(items.items()):
         with cols[idx % columns_count]:
-            render_menu_item_row(category, item_name, price, show_usd=show_usd)
+            if use_tiles:
+                render_product_tile(category, item_name, price, show_usd=show_usd)
+            else:
+                render_menu_item_row(category, item_name, price, show_usd=show_usd)
 
 
 def format_order_text():
@@ -870,6 +894,12 @@ def format_order_text():
     order_lines.append("")
     order_lines.append(f"Tasa BCV: Bs. {st.session_state.dollar_rate:,.2f} por USD")
     order_lines.append("")
+    notes = (st.session_state.get("chef_notes") or "").strip()
+    if notes:
+        order_lines.append("-" * 50)
+        order_lines.append("NOTAS / INSTRUCCIONES:")
+        order_lines.append(notes)
+        order_lines.append("")
     order_lines.append("=" * 50)
     order_lines.append("¡GRACIAS POR SU PEDIDO!")
     order_lines.append("=" * 50)
@@ -1325,8 +1355,93 @@ def print_to_system_printer(content, printer_name=None):
         return False, f"Error al imprimir: {str(e)}"
 
 
+def _set_nav_key(k):
+    st.session_state.nav_key = k
+
+
 def _nav_pedido():
-    st.session_state.castell_nav = "Pedido"
+    st.session_state.nav_key = "pedido"
+
+
+def product_tile_emoji(category, item_name):
+    n = item_name.lower()
+    if "Bebidas" in category or "refresco" in n or "agua" in n or "té" in n or "jamaica" in n or "matcha" in n:
+        return "🥤"
+    if "dolce" in n or "nocciola" in n or "pistacchio" in n:
+        return "🍫"
+    if "pasticho" in n:
+        return "🍝"
+    if "calzone" in n:
+        return "🥟"
+    if "multicereal" in n:
+        return "🌾"
+    return get_size_emoji(item_name) or "🍕"
+
+
+def render_product_tile(category, item_name, price, *, show_usd):
+    """Tarjeta tipo mockup: emoji + nombre corto + botón + (sin precio en tarjeta)."""
+    use_pizza_flow = category in PIZZA_QUICK_ADD_CATEGORIES
+    short_name = compact_item_label(item_name)
+    em = product_tile_emoji(category, item_name)
+    st.markdown(
+        f"""<div class="cp-card">
+        <div class="cp-card-emoji">{em}</div>
+        <div class="cp-card-title">{short_name}</div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+    _tid = hashlib.sha256(f"{category}|{item_name}".encode("utf-8")).hexdigest()[:20]
+    if use_pizza_flow:
+        st.button(
+            "＋ Agregar",
+            key=f"tile_{_tid}",
+            on_click=start_pizza_order,
+            args=(item_name,),
+            use_container_width=True,
+            type="primary",
+        )
+    else:
+        st.button(
+            "＋ Agregar",
+            key=f"tile_{_tid}",
+            on_click=add_to_order,
+            args=(item_name,),
+            use_container_width=True,
+            type="primary",
+        )
+
+
+def render_app_navigation(prefix: str):
+    """Barra de navegación estilo mockup (Menú / Pedido / Resumen)."""
+    nk = st.session_state.nav_key
+    u1, u2, u3 = st.columns(3)
+    with u1:
+        st.button(
+            "🍕 Menú",
+            key=f"{prefix}_m",
+            use_container_width=True,
+            type="primary" if nk == "menu" else "secondary",
+            on_click=_set_nav_key,
+            args=("menu",),
+        )
+    with u2:
+        st.button(
+            "🛒 Pedido",
+            key=f"{prefix}_p",
+            use_container_width=True,
+            type="primary" if nk == "pedido" else "secondary",
+            on_click=_set_nav_key,
+            args=("pedido",),
+        )
+    with u3:
+        st.button(
+            "📋 Resumen",
+            key=f"{prefix}_r",
+            use_container_width=True,
+            type="primary" if nk == "resumen" else "secondary",
+            on_click=_set_nav_key,
+            args=("resumen",),
+        )
 
 
 def render_print_ticket_buttons(key_suffix=""):
@@ -1418,38 +1533,109 @@ CASTELL_CSS = """
 <style>
     :root {
         --castell-red: #b22222;
-        --castell-red-dark: #8b0000;
-        --castell-gold: #c9a227;
-        --castell-bg: #f8f8f8;
-        --castell-card: #ffffff;
+        --castell-red-dark: #7a1818;
+        --castell-gold: #d4a017;
+        --castell-bg: #f4f4f5;
+        --castell-line: #e8e8e8;
     }
     .block-container {
-        padding-top: 0.5rem !important;
-        padding-bottom: 4.5rem !important;
-        max-width: 28rem !important;
+        padding-top: 0.35rem !important;
+        padding-bottom: 5.5rem !important;
+        padding-left: 0.65rem !important;
+        padding-right: 0.65rem !important;
+        max-width: 420px !important;
         background: var(--castell-bg) !important;
     }
-    h1, h2, h3 { letter-spacing: -0.02em; }
+    #MainMenu {visibility: hidden;}
+    header[data-testid="stHeader"] {background: transparent !important;}
+    .castell-topbar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0.4rem 0 0.6rem 0;
+        border-bottom: 1px solid var(--castell-line);
+        margin-bottom: 0.5rem;
+        background: #fff;
+        margin-left: -0.65rem; margin-right: -0.65rem;
+        padding-left: 0.75rem; padding-right: 0.75rem;
+    }
+    .castell-brand {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 1.2rem; font-weight: 700; color: var(--castell-red); margin: 0; letter-spacing: -0.02em;
+    }
+    .castell-tagline { font-size: 0.72rem; color: #777; margin: 0.1rem 0 0 0; }
+    .cp-card {
+        background: #fff;
+        border-radius: 18px;
+        padding: 10px 8px 6px 8px;
+        text-align: center;
+        box-shadow: 0 2px 14px rgba(0,0,0,0.06);
+        border: 1px solid #f0f0f0;
+        margin-bottom: 4px;
+    }
+    .cp-card-emoji { font-size: 1.75rem; line-height: 1.2; }
+    .cp-card-title {
+        font-size: 0.78rem; font-weight: 600; color: #222;
+        line-height: 1.25; margin-top: 4px; min-height: 2.2rem;
+    }
+    .pq-hero {
+        background: linear-gradient(180deg, #fff 0%, #fafafa 100%);
+        border-radius: 16px;
+        padding: 12px 14px;
+        border: 1px solid #eee;
+        margin-bottom: 8px;
+    }
+    .pq-hero-title { font-size: 0.7rem; font-weight: 700; color: var(--castell-red); text-transform: uppercase; letter-spacing: 0.06em; }
+    .pq-pizza-name { font-size: 1.05rem; font-weight: 700; color: #111; margin: 0 0 8px 0; }
+    .pq-section { font-size: 0.72rem; font-weight: 700; color: var(--castell-red); margin: 10px 0 6px 0; text-transform: uppercase; letter-spacing: 0.04em; }
+    .castell-nav-wrap {
+        background: #fff;
+        border-radius: 14px;
+        padding: 6px;
+        border: 1px solid var(--castell-line);
+        margin-bottom: 10px;
+        box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+    }
+    .castell-dock {
+        background: #fff;
+        border-radius: 14px;
+        padding: 10px 12px;
+        border: 1px solid var(--castell-line);
+        margin-top: 8px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    }
+    .castell-card-panel {
+        background: #fff;
+        border-radius: 16px;
+        padding: 12px 14px;
+        border: 1px solid #eee;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
     div[data-testid="stRadio"] > div { flex-wrap: wrap !important; gap: 0.35rem !important; }
-    div[data-testid="stRadio"] label {
+    div[data-testid="stRadio"] label[data-baseweb="radio"] {
         border-radius: 999px !important;
-        padding: 0.35rem 0.75rem !important;
-        border: 1px solid #e0e0e0 !important;
+    }
+    button[kind="primary"] {
+        background: linear-gradient(180deg, #c92a2a 0%, var(--castell-red-dark) 100%) !important;
+        border: none !important;
+        color: #fff !important;
+        font-weight: 600 !important;
+    }
+    button[kind="secondary"] {
         background: #fff !important;
+        border: 1px solid #ddd !important;
+        color: #333 !important;
     }
     button[kind="secondary"], button[kind="primary"] {
-        min-height: 2rem !important;
-        font-size: 0.85rem !important;
-        border-radius: 12px !important;
+        min-height: 2.15rem !important;
+        font-size: 0.82rem !important;
+        border-radius: 14px !important;
     }
-    .castell-header {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0.25rem 0 0.5rem 0; margin-bottom: 0.25rem;
-        border-bottom: 1px solid #eee;
+    div[data-testid="stTextInput"] input {
+        border-radius: 999px !important;
+        border: 1px solid #ddd !important;
+        padding: 10px 14px !important;
     }
-    .castell-brand { font-size: 1.15rem; font-weight: 700; color: var(--castell-red); margin: 0; }
-    .castell-sub { font-size: 0.75rem; color: #666; margin-top: 0.15rem; }
-    div[data-testid="stSidebarNav"] { font-size: 0.9rem; }
+    .stMetric { background: transparent !important; }
 </style>
 """
 st.markdown(CASTELL_CSS, unsafe_allow_html=True)
@@ -1461,36 +1647,36 @@ if "dollar_rate" not in st.session_state:
     else:
         st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
 
-if "castell_nav" not in st.session_state:
-    st.session_state.castell_nav = "Menú"
+st.session_state.pop("castell_nav", None)
 
-# Cabecera estilo app
+# Cabecera mockup
 hc1, hc2, hc3 = st.columns([1, 4, 2])
 with hc1:
     st.caption("☰")
 with hc2:
-    st.markdown('<p class="castell-brand">Castell Pizzas</p><p class="castell-sub">Pedidos rápidos</p>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="castell-brand">Castell Pizzas</p><p class="castell-tagline">Pedidos rápidos</p>',
+        unsafe_allow_html=True,
+    )
 with hc3:
     show_usd = st.checkbox("USD/Bs", value=True, help="Mostrar montos en USD además de Bs donde aplique")
 
-st.radio(
-    "Vista",
-    ["Menú", "Pedido", "Resumen"],
-    horizontal=True,
-    label_visibility="collapsed",
-    key="castell_nav",
+st.markdown(
+    '<hr style="border:none;border-top:1px solid #e8e8e8;margin:0 0 0.35rem 0;background:#fff;">',
+    unsafe_allow_html=True,
 )
 
-nav = st.session_state.castell_nav
+with st.container(border=True):
+    render_app_navigation("nav_top")
 
-st.markdown("---")
+nk = st.session_state.nav_key
 
 # Modales primero (multicereal / 4 estaciones)
 show_multicereal_modal()
 show_4estaciones_modal()
 
 # --- Contenido por vista ---
-if nav == "Menú":
+if nk == "menu":
     with st.expander("💱 Tasa BCV", expanded=False):
         st.metric("Bolívares por USD", f"Bs. {st.session_state.dollar_rate:,.2f}")
         if st.button("🔄 Actualizar tasa", key="bcv_refresh_main"):
@@ -1563,19 +1749,28 @@ if nav == "Menú":
     _sub = order_subtotal_usd()
     _bs = _sub * st.session_state.dollar_rate
     st.markdown("---")
-    f1, f2, f3 = st.columns([2, 2, 2])
-    with f1:
-        st.caption(f"{_n} artículos")
-    with f2:
-        if show_usd:
-            st.markdown(f"**${_sub:.2f}**")
-        else:
-            st.markdown(f"**Bs. {_bs:,.2f}**")
-    with f3:
-        st.button("Pedido →", use_container_width=True, key="dock_pedido", on_click=_nav_pedido)
+    with st.container(border=True):
+        f1, f2, f3 = st.columns([2, 2, 2])
+        with f1:
+            st.caption(f"{_n} artículos")
+        with f2:
+            if show_usd:
+                st.markdown(f"**${_sub:.2f}**")
+            else:
+                st.markdown(f"**Bs. {_bs:,.2f}**")
+        with f3:
+            st.button("Pedido →", use_container_width=True, key="dock_pedido", on_click=_nav_pedido)
 
-elif nav == "Pedido":
+elif nk == "pedido":
     st.markdown("##### Tu pedido")
+    st.caption("👨‍🍳 Notas para cocina")
+    st.text_area(
+        "notas_cocina",
+        height=72,
+        placeholder="Ej. sin cebolla, bien cocida…",
+        key="chef_notes",
+        label_visibility="collapsed",
+    )
     customer_name = st.text_input("Nombre del cliente", value=st.session_state.customer_name, placeholder="Nombre", key="cust_field")
     if customer_name != st.session_state.customer_name:
         st.session_state.customer_name = customer_name
@@ -1668,6 +1863,7 @@ elif nav == "Pedido":
         st.session_state.order.clear()
         st.session_state.customer_name = ""
         st.session_state.order_type = "Para comer aquí"
+        st.session_state.chef_notes = ""
         cancel_pending_pizza()
 
 else:
@@ -1703,5 +1899,10 @@ else:
         st.session_state.order.clear()
         st.session_state.customer_name = ""
         st.session_state.order_type = "Para comer aquí"
+        st.session_state.chef_notes = ""
         cancel_pending_pizza()
+
+st.markdown("")
+with st.container(border=True):
+    render_app_navigation("nav_bot")
 
