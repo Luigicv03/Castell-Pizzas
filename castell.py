@@ -161,7 +161,8 @@ def clear_carryout_box_lines():
 def sync_carryout_boxes():
     """Pickup/Delivery: una caja por pizza según tamaño (P/M/G)."""
     needed = {BOX_25: 0, BOX_33: 0, BOX_40: 0}
-    for item, qty in st.session_state.order.items():
+    o = st.session_state.order
+    for item, qty in list(o.items()):
         if item == "🚚 Delivery":
             continue
         if item in BOX_KEYS_ORDER:
@@ -170,10 +171,10 @@ def sync_carryout_boxes():
         if bk:
             needed[bk] += int(qty)
     for bk in BOX_KEYS_ORDER:
-        st.session_state.order.pop(bk, None)
+        o.pop(bk, None)
     for bk, n in needed.items():
         if n > 0:
-            st.session_state.order[bk] = n
+            o[bk] = int(n)
 
 
 def _set_order_type_here():
@@ -1567,6 +1568,8 @@ def _set_nav_key(k):
 
 def _nav_pedido():
     st.session_state.nav_key = "pedido"
+    if st.session_state.get("order_type") in CARRYOUT_ORDER_TYPES:
+        sync_carryout_boxes()
 
 
 def product_tile_emoji(category, item_name):
@@ -1842,8 +1845,15 @@ CASTELL_CSS = """
         padding: 10px 14px !important;
     }
     .stMetric { background: transparent !important; }
-    .cp-pedido-nombre { font-size: 0.82rem !important; line-height: 1.2 !important; margin: 0 !important; color: #222 !important; }
-    .cp-pedido-qty { font-size: 0.82rem !important; font-weight: 600 !important; margin: 0 !important; text-align: center !important; color: #333 !important; }
+    .cp-pedido-nombre {
+        font-size: 0.8rem !important; line-height: 1.2 !important; margin: 0 !important; padding: 0 !important;
+        color: #222 !important; max-height: 2.5em; overflow: hidden;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .cp-pedido-qty {
+        font-size: 0.8rem !important; font-weight: 700 !important; margin: 0 !important; padding: 0.35rem 0 0 0 !important;
+        text-align: center !important; color: #333 !important;
+    }
 </style>
 """
 st.markdown(CASTELL_CSS, unsafe_allow_html=True)
@@ -1993,29 +2003,29 @@ elif nk == "pedido":
 
     t1, t2, t3 = st.columns(3)
     with t1:
-        st.button(
+        if st.button(
             "Comer aquí",
             use_container_width=True,
             type="primary" if st.session_state.order_type == "Para comer aquí" else "secondary",
-            on_click=_set_order_type_here,
             key="ot_here",
-        )
+        ):
+            _set_order_type_here()
     with t2:
-        st.button(
+        if st.button(
             "Pickup",
             use_container_width=True,
             type="primary" if st.session_state.order_type == "Para llevar (PICKUP)" else "secondary",
-            on_click=_set_order_type_pickup,
             key="ot_pickup",
-        )
+        ):
+            _set_order_type_pickup()
     with t3:
-        st.button(
+        if st.button(
             "Delivery",
             use_container_width=True,
             type="primary" if st.session_state.order_type == "Para llevar (DELIVERY)" else "secondary",
-            on_click=_set_order_type_delivery,
             key="ot_delivery",
-        )
+        ):
+            _set_order_type_delivery()
 
     if st.session_state.order_type == "Para llevar (DELIVERY)":
         st.caption("Zona de envío")
@@ -2056,20 +2066,26 @@ elif nk == "pedido":
             size_emoji = get_size_emoji(item)
             item_with_emoji = f"{size_emoji} {item}" if size_emoji else item
             safe_html = html.escape(item_with_emoji)
-            c1, c2, c3, c4 = st.columns(
-                [5.2, 1.0, 1.0, 1.0], gap="small", vertical_alignment="center"
-            )
-            with c1:
+            # Dos columnas: nombre (flex) | cantidad + botones en una sola franja (evita apilado vertical)
+            cname, cctrl = st.columns([0.62, 0.38], gap="small")
+            with cname:
                 st.markdown(
                     f'<p class="cp-pedido-nombre">{safe_html}</p>',
                     unsafe_allow_html=True,
                 )
-            with c2:
-                st.markdown(f'<p class="cp-pedido-qty">×{quantity}</p>', unsafe_allow_html=True)
-            with c3:
-                st.button("−", key=f"rm_{lk}", on_click=remove_from_order, args=(item,), use_container_width=True)
-            with c4:
-                st.button("+", key=f"ad_{lk}", on_click=add_to_order, args=(item,), use_container_width=True)
+            with cctrl:
+                qcol, b1, b2 = st.columns([1.1, 1, 1], gap="small")
+                with qcol:
+                    st.markdown(
+                        f'<p class="cp-pedido-qty">×{int(quantity)}</p>',
+                        unsafe_allow_html=True,
+                    )
+                with b1:
+                    if st.button("−", key=f"rm_{lk}", use_container_width=True):
+                        remove_from_order(item)
+                with b2:
+                    if st.button("+", key=f"ad_{lk}", use_container_width=True):
+                        add_to_order(item)
 
         if _carryout:
             p25 = st.session_state.order.get(BOX_25, 0)
