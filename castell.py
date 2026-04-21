@@ -115,6 +115,42 @@ MENU = {
 # Categorías donde al tocar una pizza se abre el flujo rápido (extras mismo tamaño)
 PIZZA_QUICK_ADD_CATEGORIES = ("Pizzas Tradicionales", "Pizzas Especiales")
 
+# Tamaños estándar (coinciden con claves del MENU)
+PIZZA_SIZE_ORDER = ("Personal", "Mediana", "Familiar")
+PIZZA_SIZE_SUFFIX = {
+    "Personal": "Personal 25cm",
+    "Mediana": "Mediana 33cm",
+    "Familiar": "Familiar 40cm",
+}
+
+
+def pizza_base_name_from_key(menu_key):
+    """Margherita (Personal 25cm) -> Margherita"""
+    if " (" not in menu_key:
+        return menu_key
+    return menu_key.split(" (")[0]
+
+
+def resolve_pizza_menu_key(category, base_name, size_label):
+    """Devuelve la clave exacta del MENU o None."""
+    suf = PIZZA_SIZE_SUFFIX.get(size_label)
+    if not suf or category not in MENU:
+        return None
+    key = f"{base_name} ({suf})"
+    return key if key in MENU[category] else None
+
+
+def collapse_pizza_category_to_bases(category, items_dict):
+    """Una fila por pizza (sin tamaños): nombre base -> precio mínimo (solo referencia interna)."""
+    if category not in PIZZA_QUICK_ADD_CATEGORIES:
+        return items_dict
+    bases = {}
+    for k, price in items_dict.items():
+        b = pizza_base_name_from_key(k)
+        if b not in bases or price < bases[b]:
+            bases[b] = price
+    return bases
+
 # Pestañas del menú (móvil): agrupa categorías para menos scroll
 MENU_TAB_GROUPS = [
     ("🍕 Pizzas", ["Pizzas Tradicionales", "Pizzas Especiales"]),
@@ -153,6 +189,10 @@ if 'nav_key' not in st.session_state:
     st.session_state.nav_key = "menu"
 if 'chef_notes' not in st.session_state:
     st.session_state.chef_notes = ""
+if 'pending_pizza_base' not in st.session_state:
+    st.session_state.pending_pizza_base = None
+if 'pending_pizza_category' not in st.session_state:
+    st.session_state.pending_pizza_category = None
 
 
 # --- FUNCIONES PARA API DEL DÓLAR ---
@@ -604,13 +644,12 @@ def add_to_order(item_name):
         st.session_state.order[item_name] += 1
 
 
-def start_pizza_order(item_name):
-    """Pizzas tradicionales/especiales: abre panel de extras; multicereal y 4 estaciones siguen con modal."""
-    if ("multicereal" in item_name.lower() or "4 estaciones" in item_name.lower()) and "(con " not in item_name.lower():
-        add_to_order(item_name)
-        return
-    st.session_state.pending_pizza = item_name
+def start_pizza_base_order(category, base_name):
+    """Menú sin tamaño: abre el asistente (tamaño → extras). 4 estaciones abre el modal tras elegir tamaño."""
+    st.session_state.pending_pizza = None
     st.session_state.pending_extra_counts = {}
+    st.session_state.pending_pizza_base = base_name
+    st.session_state.pending_pizza_category = category
 
 
 def pizza_order_size_label(item_name):
@@ -639,6 +678,27 @@ def short_ingredient_menu_label(full_key):
 
 def cancel_pending_pizza():
     st.session_state.pending_pizza = None
+    st.session_state.pending_extra_counts = {}
+    st.session_state.pending_pizza_base = None
+    st.session_state.pending_pizza_category = None
+
+
+def _apply_pizza_size_choice(size_label):
+    cat = st.session_state.pending_pizza_category
+    base = st.session_state.pending_pizza_base
+    if not cat or not base:
+        return
+    full = resolve_pizza_menu_key(cat, base, size_label)
+    if not full:
+        return
+    st.session_state.pending_pizza_base = None
+    st.session_state.pending_pizza_category = None
+    if "4 estaciones" in base.lower():
+        st.session_state.estaciones_item = full
+        st.session_state.show_4estaciones_modal = True
+        st.session_state.selected_estaciones_ingredients = []
+        return
+    st.session_state.pending_pizza = full
     st.session_state.pending_extra_counts = {}
 
 
@@ -689,8 +749,62 @@ def order_subtotal_usd():
     return total
 
 
+def order_article_count():
+    """Cantidad de líneas de producto (excluye delivery; cantidades enteras)."""
+    n = 0
+    for k, q in st.session_state.order.items():
+        if k == "🚚 Delivery":
+            continue
+        n += int(q)
+    return n
+
+
 def render_pizza_quick_panel():
-    """Panel estilo mockup: armar pizza + extras (2 columnas), sin precios en botones."""
+    """Paso 1: elegir tamaño (sin tamaños en el menú). Paso 2: extras y confirmar."""
+    base = st.session_state.get("pending_pizza_base")
+    cat = st.session_state.get("pending_pizza_category")
+    if base and cat:
+        st.markdown(
+            f"""
+<div class="pq-hero">
+  <div class="pq-hero-title">Elegir tamaño</div>
+  <p class="pq-pizza-name">{base}</p>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption("Selecciona un tamaño para continuar.")
+        s1, s2, s3 = st.columns(3)
+        with s1:
+            st.button(
+                "Personal",
+                use_container_width=True,
+                type="primary",
+                key="pq_sz_p",
+                on_click=_apply_pizza_size_choice,
+                args=("Personal",),
+            )
+        with s2:
+            st.button(
+                "Mediana",
+                use_container_width=True,
+                type="primary",
+                key="pq_sz_m",
+                on_click=_apply_pizza_size_choice,
+                args=("Mediana",),
+            )
+        with s3:
+            st.button(
+                "Familiar",
+                use_container_width=True,
+                type="primary",
+                key="pq_sz_f",
+                on_click=_apply_pizza_size_choice,
+                args=("Familiar",),
+            )
+        st.button("← Cancelar", use_container_width=True, key="pq_cancel_size", on_click=cancel_pending_pizza)
+        return
+
     pending = st.session_state.get("pending_pizza")
     if not pending:
         return
@@ -700,7 +814,7 @@ def render_pizza_quick_panel():
     st.markdown(
         f"""
 <div class="pq-hero">
-  <div class="pq-hero-title">Armar pizza</div>
+  <div class="pq-hero-title">Ingredientes adicionales</div>
   <p class="pq-pizza-name">{_pn}</p>
 </div>
         """,
@@ -717,7 +831,7 @@ def render_pizza_quick_panel():
                 cancel_pending_pizza()
         return
 
-    st.caption("Extras al mismo tamaño. Toca para marcar / desmarcar.")
+    st.caption("Opcional: toca para marcar / desmarcar. Luego añade al pedido.")
 
     trad = menu_items_for_size("Ingredientes Tradicionales (Pizza)", size)
     prem = menu_items_for_size("Ingredientes Premium (Pizza)", size)
@@ -809,16 +923,25 @@ def render_menu_item_row(category, item_name, price, *, show_usd):
             use_container_width=True,
         )
     else:
-        short_name = compact_item_label(item_name)
+        short_name = (
+            pizza_base_name_from_key(item_name) if use_pizza_flow else compact_item_label(item_name)
+        )
         button_label = f"{size_emoji} {short_name}" if size_emoji else short_name
         if use_pizza_flow:
-            st.button(button_label, key=item_name, on_click=start_pizza_order, args=(item_name,), use_container_width=True)
+            st.button(
+                button_label,
+                key=item_name,
+                on_click=start_pizza_base_order,
+                args=(category, pizza_base_name_from_key(item_name)),
+                use_container_width=True,
+            )
         else:
             st.button(button_label, key=item_name, on_click=add_to_order, args=(item_name,), use_container_width=True)
 
 
 def render_category_grid(category, items, *, show_usd, columns_count=2):
     """Grid compacto: tarjetas mockup para pizzas/platos/bebidas; toggles para ingredientes."""
+    items = collapse_pizza_category_to_bases(category, dict(items))
     use_tiles = category in (
         "Pizzas Tradicionales",
         "Pizzas Especiales",
@@ -837,29 +960,44 @@ def render_category_grid(category, items, *, show_usd, columns_count=2):
 
 
 def format_order_text():
-    if not st.session_state.order:
-        return "Pedido vacío", 0.0
     order_lines = []
     subtotal_usd = 0.0
-    all_items = {k: v for category in MENU.values() for k, v in category.items()}
-    sorted_order = sorted(st.session_state.order.items())
-    
-    # Agregar información del cliente al inicio
+
+    # Obtener tasa del dólar
+    if 'dollar_rate' not in st.session_state:
+        st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
+
+    # Encabezado siempre (nombre, tipo y líneas aunque aún no haya productos)
     order_lines.append("=" * 50)
     order_lines.append("CASTELL PIZZAS")
     order_lines.append("=" * 50)
     order_lines.append("")
-    order_lines.append(f"CLIENTE: {st.session_state.customer_name or 'Sin nombre'}")
+    order_lines.append(f"CLIENTE: {st.session_state.get('customer_name') or 'Sin nombre'}")
     order_lines.append(f"TIPO: {st.session_state.order_type}")
     order_lines.append("")
     order_lines.append("-" * 50)
     order_lines.append("PEDIDO:")
     order_lines.append("-" * 50)
-    
-    # Obtener tasa del dólar
-    if 'dollar_rate' not in st.session_state:
-        st.session_state.dollar_rate, st.session_state.api_source = get_dollar_rate()
-    
+
+    if not st.session_state.order:
+        order_lines.append("(Sin productos aún)")
+        order_lines.append("")
+        order_lines.append("-" * 50)
+        order_lines.append(f"Tasa BCV: Bs. {st.session_state.dollar_rate:,.2f} por USD")
+        order_lines.append("")
+        notes = (st.session_state.get("chef_notes") or "").strip()
+        if notes:
+            order_lines.append("-" * 50)
+            order_lines.append("NOTAS / INSTRUCCIONES:")
+            order_lines.append(notes)
+            order_lines.append("")
+        order_lines.append("=" * 50)
+        order_lines.append("¡GRACIAS POR SU PEDIDO!")
+        order_lines.append("=" * 50)
+        return "\n".join(order_lines), 0.0
+
+    sorted_order = sorted(st.session_state.order.items())
+
     for item, quantity in sorted_order:
         # Manejar delivery de forma especial
         if item == "🚚 Delivery":
@@ -1016,10 +1154,11 @@ def format_kitchen_ticket_58mm():
     sorted_order = sorted(st.session_state.order.items())
     
     for item, quantity in sorted_order:
-        # Saltar delivery en ticket de cocina
         if item == "🚚 Delivery":
+            lines.append("🚚 Delivery")
+            lines.append("")
             continue
-            
+
         # Formatear nombre del item (sin emoji para impresión)
         item_clean = item.replace("🟢", "").replace("⚪", "").replace("🔴", "").strip()
         
@@ -1381,7 +1520,7 @@ def product_tile_emoji(category, item_name):
 def render_product_tile(category, item_name, price, *, show_usd):
     """Tarjeta tipo mockup: emoji + nombre corto + botón + (sin precio en tarjeta)."""
     use_pizza_flow = category in PIZZA_QUICK_ADD_CATEGORIES
-    short_name = compact_item_label(item_name)
+    short_name = item_name if use_pizza_flow else compact_item_label(item_name)
     em = product_tile_emoji(category, item_name)
     st.markdown(
         f"""<div class="cp-card">
@@ -1395,8 +1534,8 @@ def render_product_tile(category, item_name, price, *, show_usd):
         st.button(
             "＋ Agregar",
             key=f"tile_{_tid}",
-            on_click=start_pizza_order,
-            args=(item_name,),
+            on_click=start_pizza_base_order,
+            args=(category, item_name),
             use_container_width=True,
             type="primary",
         )
@@ -1711,41 +1850,48 @@ if nk == "menu":
 
     render_pizza_quick_panel()
 
-    st.markdown("##### Catálogo")
-    st.caption("🟢 P · ⚪ M · 🔴 F")
-
-    section_labels = ["🍕 Pizzas", "🍝 Otros", "➕ Extras"]
-    section_pick = st.radio(
-        "Categoría",
-        section_labels,
-        horizontal=True,
-        label_visibility="collapsed",
-        key="castell_menu_section",
+    _wiz = bool(
+        st.session_state.get("pending_pizza_base")
+        or st.session_state.get("pending_pizza")
     )
-    tab_idx = section_labels.index(section_pick)
-    _, group_cats = MENU_TAB_GROUPS[tab_idx]
+    if not _wiz:
+        st.markdown("##### Catálogo")
+        st.caption("🟢 P · ⚪ M · 🔴 F (tras elegir pizza: tamaño → extras)")
 
-    if not search_term:
-        visible_cats = [cat for cat in group_cats if cat in filtered_menu]
-        if not visible_cats:
-            st.caption("Sin productos.")
+        section_labels = ["🍕 Pizzas", "🍝 Otros", "➕ Extras"]
+        section_pick = st.radio(
+            "Categoría",
+            section_labels,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="castell_menu_section",
+        )
+        tab_idx = section_labels.index(section_pick)
+        _, group_cats = MENU_TAB_GROUPS[tab_idx]
+
+        if not search_term:
+            visible_cats = [cat for cat in group_cats if cat in filtered_menu]
+            if not visible_cats:
+                st.caption("Sin productos.")
+            else:
+                selected_cat = st.selectbox(
+                    "Sección",
+                    options=visible_cats,
+                    key="mobile_cat_selector_0",
+                    label_visibility="collapsed",
+                )
+                grid_cols = 3 if ("Ingredientes" in selected_cat or "Adicionales Calzone" in selected_cat) else 2
+                render_category_grid(selected_cat, filtered_menu[selected_cat], show_usd=show_usd, columns_count=grid_cols)
         else:
-            selected_cat = st.selectbox(
-                "Sección",
-                options=visible_cats,
-                key="mobile_cat_selector_0",
-                label_visibility="collapsed",
-            )
-            grid_cols = 3 if ("Ingredientes" in selected_cat or "Adicionales Calzone" in selected_cat) else 2
-            render_category_grid(selected_cat, filtered_menu[selected_cat], show_usd=show_usd, columns_count=grid_cols)
+            for category, items in filtered_menu.items():
+                st.markdown(f"**{category}**")
+                grid_cols = 3 if ("Ingredientes" in category or "Adicionales Calzone" in category) else 2
+                render_category_grid(category, items, show_usd=show_usd, columns_count=grid_cols)
     else:
-        for category, items in filtered_menu.items():
-            st.markdown(f"**{category}**")
-            grid_cols = 3 if ("Ingredientes" in category or "Adicionales Calzone" in category) else 2
-            render_category_grid(category, items, show_usd=show_usd, columns_count=grid_cols)
+        st.caption("Completa tamaño e ingredientes arriba, o cancela para volver al catálogo.")
 
     # Barra tipo checkout (mockup): artículos + subtotal + ir a pedido
-    _n = sum(st.session_state.order.values()) if st.session_state.order else 0
+    _n = order_article_count()
     _sub = order_subtotal_usd()
     _bs = _sub * st.session_state.dollar_rate
     st.markdown("---")
@@ -1771,9 +1917,7 @@ elif nk == "pedido":
         key="chef_notes",
         label_visibility="collapsed",
     )
-    customer_name = st.text_input("Nombre del cliente", value=st.session_state.customer_name, placeholder="Nombre", key="cust_field")
-    if customer_name != st.session_state.customer_name:
-        st.session_state.customer_name = customer_name
+    st.text_input("Nombre del cliente", placeholder="Nombre", key="customer_name")
 
     t1, t2, t3 = st.columns(3)
     with t1:
