@@ -1,6 +1,7 @@
 ﻿import streamlit as st
 from collections import Counter
 import hashlib
+import html
 import requests
 import os
 import platform
@@ -122,6 +123,72 @@ PIZZA_SIZE_SUFFIX = {
     "Mediana": "Mediana 33cm",
     "Familiar": "Familiar 40cm",
 }
+
+BOX_25 = "Caja para llevar (25cm)"
+BOX_33 = "Caja para llevar (33cm)"
+BOX_40 = "Caja para llevar (40cm)"
+BOX_KEYS_ORDER = (BOX_25, BOX_33, BOX_40)
+CARRYOUT_ORDER_TYPES = ("Para llevar (PICKUP)", "Para llevar (DELIVERY)")
+
+
+def box_key_for_pizza_order_line(item_name: str):
+    """Devuelve la caja de cartón adecuada por pizza redonda, o None."""
+    if item_name == "🚚 Delivery" or "Caja para llevar" in item_name:
+        return None
+    if " Adicional (" in item_name:
+        return None
+    low = item_name.lower()
+    if "pasticho" in low:
+        return None
+    if "calzone" in low and "pizza" not in low:
+        return None
+    if any(x in low for x in ("refresco", "agua pequeña", "agua mediana", "té ", "te ", "jamaica", "matcha", "lata")):
+        return None
+    if "40cm" in item_name or "familiar" in low:
+        return BOX_40
+    if "33cm" in item_name or "35cm" in item_name or "mediana" in low:
+        return BOX_33
+    if "25cm" in item_name or "20cm" in item_name or "personal" in low:
+        return BOX_25
+    return None
+
+
+def clear_carryout_box_lines():
+    for bk in BOX_KEYS_ORDER:
+        st.session_state.order.pop(bk, None)
+
+
+def sync_carryout_boxes():
+    """Pickup/Delivery: una caja por pizza según tamaño (P/M/G)."""
+    needed = {BOX_25: 0, BOX_33: 0, BOX_40: 0}
+    for item, qty in st.session_state.order.items():
+        if item == "🚚 Delivery":
+            continue
+        if item in BOX_KEYS_ORDER:
+            continue
+        bk = box_key_for_pizza_order_line(item)
+        if bk:
+            needed[bk] += int(qty)
+    for bk in BOX_KEYS_ORDER:
+        st.session_state.order.pop(bk, None)
+    for bk, n in needed.items():
+        if n > 0:
+            st.session_state.order[bk] = n
+
+
+def _set_order_type_here():
+    st.session_state.order_type = "Para comer aquí"
+    clear_carryout_box_lines()
+
+
+def _set_order_type_pickup():
+    st.session_state.order_type = "Para llevar (PICKUP)"
+    sync_carryout_boxes()
+
+
+def _set_order_type_delivery():
+    st.session_state.order_type = "Para llevar (DELIVERY)"
+    sync_carryout_boxes()
 
 
 def pizza_base_name_from_key(menu_key):
@@ -1775,6 +1842,8 @@ CASTELL_CSS = """
         padding: 10px 14px !important;
     }
     .stMetric { background: transparent !important; }
+    .cp-pedido-nombre { font-size: 0.82rem !important; line-height: 1.2 !important; margin: 0 !important; color: #222 !important; }
+    .cp-pedido-qty { font-size: 0.82rem !important; font-weight: 600 !important; margin: 0 !important; text-align: center !important; color: #333 !important; }
 </style>
 """
 st.markdown(CASTELL_CSS, unsafe_allow_html=True)
@@ -1908,11 +1977,14 @@ if nk == "menu":
             st.button("Pedido →", use_container_width=True, key="dock_pedido", on_click=_nav_pedido)
 
 elif nk == "pedido":
+    if st.session_state.order_type in CARRYOUT_ORDER_TYPES:
+        sync_carryout_boxes()
+
     st.markdown("##### Tu pedido")
     st.caption("👨‍🍳 Notas para cocina")
     st.text_area(
         "notas_cocina",
-        height=72,
+        height=56,
         placeholder="Ej. sin cebolla, bien cocida…",
         key="chef_notes",
         label_visibility="collapsed",
@@ -1921,14 +1993,29 @@ elif nk == "pedido":
 
     t1, t2, t3 = st.columns(3)
     with t1:
-        if st.button("Comer aquí", use_container_width=True, type="primary" if st.session_state.order_type == "Para comer aquí" else "secondary"):
-            st.session_state.order_type = "Para comer aquí"
+        st.button(
+            "Comer aquí",
+            use_container_width=True,
+            type="primary" if st.session_state.order_type == "Para comer aquí" else "secondary",
+            on_click=_set_order_type_here,
+            key="ot_here",
+        )
     with t2:
-        if st.button("Pickup", use_container_width=True, type="primary" if st.session_state.order_type == "Para llevar (PICKUP)" else "secondary"):
-            st.session_state.order_type = "Para llevar (PICKUP)"
+        st.button(
+            "Pickup",
+            use_container_width=True,
+            type="primary" if st.session_state.order_type == "Para llevar (PICKUP)" else "secondary",
+            on_click=_set_order_type_pickup,
+            key="ot_pickup",
+        )
     with t3:
-        if st.button("Delivery", use_container_width=True, type="primary" if st.session_state.order_type == "Para llevar (DELIVERY)" else "secondary"):
-            st.session_state.order_type = "Para llevar (DELIVERY)"
+        st.button(
+            "Delivery",
+            use_container_width=True,
+            type="primary" if st.session_state.order_type == "Para llevar (DELIVERY)" else "secondary",
+            on_click=_set_order_type_delivery,
+            key="ot_delivery",
+        )
 
     if st.session_state.order_type == "Para llevar (DELIVERY)":
         st.caption("Zona de envío")
@@ -1950,43 +2037,69 @@ elif nk == "pedido":
             if st.button("Quitar delivery", key="dz_clear"):
                 del st.session_state.order["🚚 Delivery"]
 
+    _carryout = st.session_state.order_type in CARRYOUT_ORDER_TYPES
+
     if not st.session_state.order:
         st.info("Aún no hay productos. Ve a **Menú** para agregar.")
     else:
+        if "🚚 Delivery" in st.session_state.order:
+            st.caption("🚚 Delivery — tarifa incluida en el subtotal")
+
         st.caption("Ítems")
         sorted_order_items = sorted(st.session_state.order.items())
         for item, quantity in sorted_order_items:
             if item == "🚚 Delivery":
-                st.markdown("**Delivery** — tarifa en subtotal")
                 continue
+            if _carryout and item in BOX_KEYS_ORDER:
+                continue
+            lk = hashlib.sha256(item.encode("utf-8")).hexdigest()[:14]
             size_emoji = get_size_emoji(item)
             item_with_emoji = f"{size_emoji} {item}" if size_emoji else item
-            r1, r2, r3, r4 = st.columns([4, 1, 1, 1])
-            with r1:
-                st.markdown(f"{item_with_emoji}")
-            with r2:
-                st.markdown(f"**×{quantity}**")
-            with r3:
-                st.button("−", key=f"rm_{item}", on_click=remove_from_order, args=(item,))
-            with r4:
-                st.button("+", key=f"ad_{item}", on_click=add_to_order, args=(item,))
+            safe_html = html.escape(item_with_emoji)
+            c1, c2, c3, c4 = st.columns(
+                [5.2, 1.0, 1.0, 1.0], gap="small", vertical_alignment="center"
+            )
+            with c1:
+                st.markdown(
+                    f'<p class="cp-pedido-nombre">{safe_html}</p>',
+                    unsafe_allow_html=True,
+                )
+            with c2:
+                st.markdown(f'<p class="cp-pedido-qty">×{quantity}</p>', unsafe_allow_html=True)
+            with c3:
+                st.button("−", key=f"rm_{lk}", on_click=remove_from_order, args=(item,), use_container_width=True)
+            with c4:
+                st.button("+", key=f"ad_{lk}", on_click=add_to_order, args=(item,), use_container_width=True)
+
+        if _carryout:
+            p25 = st.session_state.order.get(BOX_25, 0)
+            p33 = st.session_state.order.get(BOX_33, 0)
+            p40 = st.session_state.order.get(BOX_40, 0)
+            if p25 or p33 or p40:
+                st.caption(
+                    f"📦 Cajas (auto): P ×{p25} · M ×{p33} · G ×{p40}"
+                )
+            st.caption("Con pickup/delivery las cajas se ajustan al tamaño de cada pizza.")
 
         st.markdown("##### Empaques")
-        e1, e2, e3 = st.columns(3)
-        with e1:
-            if st.button("Caja P", use_container_width=True, key="bx_p"):
-                st.session_state.order["Caja para llevar (25cm)"] += 1
-        with e2:
-            if st.button("Caja M", use_container_width=True, key="bx_m"):
-                st.session_state.order["Caja para llevar (33cm)"] += 1
-        with e3:
-            if st.button("Caja G", use_container_width=True, key="bx_g"):
-                st.session_state.order["Caja para llevar (40cm)"] += 1
-        empaque_items = [it for it in st.session_state.order.keys() if "Caja para llevar" in it]
-        if empaque_items:
-            if st.button("Quitar cajas", key="bx_all"):
-                for it in empaque_items:
-                    del st.session_state.order[it]
+        if _carryout:
+            st.caption("No hace falta sumar cajas a mano: ya van en el pedido.")
+        else:
+            e1, e2, e3 = st.columns(3)
+            with e1:
+                if st.button("Caja P", use_container_width=True, key="bx_p"):
+                    st.session_state.order["Caja para llevar (25cm)"] += 1
+            with e2:
+                if st.button("Caja M", use_container_width=True, key="bx_m"):
+                    st.session_state.order["Caja para llevar (33cm)"] += 1
+            with e3:
+                if st.button("Caja G", use_container_width=True, key="bx_g"):
+                    st.session_state.order["Caja para llevar (40cm)"] += 1
+            empaque_items = [it for it in st.session_state.order.keys() if "Caja para llevar" in it]
+            if empaque_items:
+                if st.button("Quitar cajas", key="bx_all"):
+                    for it in empaque_items:
+                        del st.session_state.order[it]
 
     sub_u = order_subtotal_usd()
     sub_bs = sub_u * st.session_state.dollar_rate
