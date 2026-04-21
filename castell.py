@@ -261,6 +261,8 @@ if 'pending_pizza_base' not in st.session_state:
     st.session_state.pending_pizza_base = None
 if 'pending_pizza_category' not in st.session_state:
     st.session_state.pending_pizza_category = None
+if 'order_bundles' not in st.session_state:
+    st.session_state.order_bundles = []
 
 
 # --- FUNCIONES PARA API DEL DÓLAR ---
@@ -393,246 +395,185 @@ def get_search_results_count(menu, search_term):
 
 # --- INGREDIENTES PARA MULTICEREAL ---
 MULTICEREAL_INGREDIENTS = [
-    "Jamón", "Queso Extra", "Maíz", "Piña", "Cebolla", "Pimentón", 
-    "Tomate en Ruedas", "Salami", "Aceitunas Negras", "Tocineta", 
-    "Pepperoni", "Champiñones", "Tomate Seco", "Anchoas", "Pesto Genovés", 
-    "Pesto Rosso", "Rúcula"
+    "Jamón", "Queso Extra", "Maíz", "Piña", "Cebolla", "Pimentón",
+    "Tomate en Ruedas", "Salami", "Aceitunas Negras", "Tocineta",
+    "Pepperoni", "Champiñones", "Tomate Seco", "Anchoas", "Pesto Genovés",
+    "Pesto Rosso", "Rúcula",
 ]
 
 # --- INGREDIENTES PARA 4 ESTACIONES ---
 ESTACIONES_INGREDIENTS = [
-    "Jamón", "Queso Extra", "Maíz", "Piña", "Cebolla", "Pimentón", 
-    "Tomate en Ruedas", "Salami", "Aceitunas Negras", "Tocineta", 
+    "Jamón", "Queso Extra", "Maíz", "Piña", "Cebolla", "Pimentón",
+    "Tomate en Ruedas", "Salami", "Aceitunas Negras", "Tocineta",
     "Pepperoni", "Champiñones", "Tomate Seco", "Anchoas", "Aceitunas Verdes",
-    "Pesto Genovés", "Pesto Rosso", "Rúcula"
+    "Pesto Genovés", "Pesto Rosso", "Rúcula",
 ]
 
+INGREDIENT_EMOJI = {
+    "Jamón": "🍖", "Queso Extra": "🧀", "Maíz": "🌽", "Piña": "🍍",
+    "Cebolla": "🧅", "Pimentón": "🫑", "Tomate en Ruedas": "🍅", "Salami": "🥩",
+    "Aceitunas Negras": "🫒", "Aceitunas Verdes": "🫒", "Tocineta": "🥓",
+    "Pepperoni": "🍕", "Champiñones": "🍄", "Tomate Seco": "🍅", "Anchoas": "🐟",
+    "Pesto Genovés": "🌿", "Pesto Rosso": "🌶️", "Rúcula": "🥬",
+}
+
+
+def toggle_multicereal_ingredient(ingredient: str):
+    """Una sola fuente de verdad: lista en session_state (evita bug de checkboxes)."""
+    lst = st.session_state.selected_ingredients
+    if ingredient in lst:
+        lst.remove(ingredient)
+    elif len(lst) < 2:
+        lst.append(ingredient)
+
+
+def toggle_estaciones_ingredient(ingredient: str):
+    lst = st.session_state.selected_estaciones_ingredients
+    if ingredient in lst:
+        lst.remove(ingredient)
+    elif len(lst) < 4:
+        lst.append(ingredient)
+
+
 def show_multicereal_modal():
-    """Muestra el modal para seleccionar ingredientes de la multicereal."""
-    if not st.session_state.get('show_multicereal_modal', False):
+    """Multicereal: botones tipo toggle (sin checkboxes; evita desfase con session_state)."""
+    if not st.session_state.get("show_multicereal_modal", False):
         return
-    
-    # Crear el modal con estilo destacado
-    st.markdown("""
-    <div style="
-        background-color: #f0f8ff;
-        border: 2px solid #4CAF50;
-        border-radius: 10px;
-        padding: 20px;
-        margin: 10px 0;
-    ">
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.container():
-        st.subheader(f"🌾 Selecciona 2 ingredientes para tu {st.session_state.multicereal_item}")
-        st.info("💡 Los ingredientes están incluidos en el precio de la pizza multicereal")
-        
-        selected_count = len(st.session_state.get('selected_ingredients', []))
-        
-        # Mostrar progreso
-        progress_text = f"Ingredientes seleccionados: {selected_count}/2"
-        st.progress(min(selected_count / 2.0, 1.0))
-        if selected_count == 0:
-            st.warning(f"⚠️ {progress_text}")
-        elif selected_count == 1:
-            st.info(f"ℹ️ {progress_text}")
-        else:
-            st.success(f"✅ {progress_text}")
-        
-        # Dos columnas: mejor en pantallas pequeñas
-        cols = st.columns(2)
-        
-        for i, ingredient in enumerate(MULTICEREAL_INGREDIENTS):
-            with cols[i % 2]:
-                is_selected = ingredient in st.session_state.get('selected_ingredients', [])
-                
-                # Deshabilitar si ya se seleccionaron 2 y este no está seleccionado
-                disabled = selected_count >= 2 and not is_selected
-                
-                # Crear checkbox con emoji
-                emoji_map = {
-                    "Jamón": "🍖", "Queso Extra": "🧀", "Maíz": "🌽", "Piña": "🍍",
-                    "Cebolla": "🧅", "Pimentón": "🫑", "Tomate en Ruedas": "🍅", "Salami": "🥩",
-                    "Aceitunas Negras": "🫒", "Tocineta": "🥓", "Pepperoni": "🍕", "Champiñones": "🍄",
-                    "Tomate Seco": "🍅", "Anchoas": "🐟", "Pesto Genovés": "🌿", "Pesto Rosso": "🌶️", "Rúcula": "🥬"
-                }
-                
-                ingredient_display = f"{emoji_map.get(ingredient, '🔸')} {ingredient}"
-                
-                if st.checkbox(
-                    ingredient_display, 
-                    value=is_selected, 
-                    key=f"ingredient_{ingredient}",
-                    disabled=disabled
+
+    gen = int(st.session_state.get("multicereal_modal_generation", 0))
+    pizza_raw = st.session_state.get("multicereal_item", "Pizza Multicereal")
+    pizza_short = pizza_raw.split(" (")[0] if " (" in pizza_raw else pizza_raw
+    sel = st.session_state.get("selected_ingredients", [])
+    n = len(sel)
+
+    with st.container(border=True):
+        st.markdown(
+            f'<p class="cp-modal-kicker">Multicereal</p><h3 class="cp-modal-title">Elige 2 ingredientes</h3>',
+            unsafe_allow_html=True,
+        )
+        st.caption(f"Pizza: {pizza_short} · Incluidos en el precio")
+        m1, m2 = st.columns(2)
+        with m1:
+            st.metric("Selección", f"{n} / 2", delta="Listo" if n == 2 else None)
+        with m2:
+            st.progress(min(n / 2.0, 1.0))
+
+        grid = st.columns(2)
+        for idx, ingredient in enumerate(MULTICEREAL_INGREDIENTS):
+            with grid[idx % 2]:
+                em = INGREDIENT_EMOJI.get(ingredient, "🔸")
+                on = ingredient in sel
+                label = f"✓ {em} {ingredient}" if on else f"{em} {ingredient}"
+                disabled = n >= 2 and not on
+                if st.button(
+                    label,
+                    key=f"mc_{gen}_{idx}",
+                    use_container_width=True,
+                    type="primary" if on else "secondary",
+                    disabled=disabled,
                 ):
-                    if ingredient not in st.session_state.selected_ingredients:
-                        if len(st.session_state.selected_ingredients) < 2:
-                            st.session_state.selected_ingredients.append(ingredient)
-                else:
-                    if ingredient in st.session_state.selected_ingredients:
-                        st.session_state.selected_ingredients.remove(ingredient)
-        
-        # Mostrar ingredientes seleccionados
-        if st.session_state.selected_ingredients:
-            ingredients_with_emojis = []
-            emoji_map = {
-                "Jamón": "🍖", "Queso Extra": "🧀", "Maíz": "🌽", "Piña": "🍍",
-                "Cebolla": "🧅", "Pimentón": "🫑", "Tomate en Ruedas": "🍅", "Salami": "🥩",
-                "Aceitunas Negras": "🫒", "Tocineta": "🥓", "Pepperoni": "🍕", "Champiñones": "🍄",
-                "Tomate Seco": "🍅", "Anchoas": "🐟", "Pesto Genovés": "🌿", "Pesto Rosso": "🌶️", "Rúcula": "🥬"
-            }
-            
-            for ing in st.session_state.selected_ingredients:
-                ingredients_with_emojis.append(f"{emoji_map.get(ing, '🔸')} {ing}")
-            
-            st.markdown(f"**Tus ingredientes:** {' + '.join(ingredients_with_emojis)}")
-        
-        st.markdown("---")
-        
-        # Botones de acción
-        col1, col2, col3 = st.columns([1, 1, 1])
-        
-        with col1:
-            confirm_disabled = len(st.session_state.selected_ingredients) != 2
-            if st.button("✅ Confirmar Pizza", disabled=confirm_disabled, use_container_width=True):
-                # Agregar la pizza con ingredientes al pedido
+                    toggle_multicereal_ingredient(ingredient)
+
+        if sel:
+            st.caption("Elegidos: " + " · ".join(f"{INGREDIENT_EMOJI.get(x, '•')} {x}" for x in sel))
+
+        a1, a2, a3 = st.columns(3)
+        with a1:
+            ok = n == 2
+            if st.button(
+                "✅ Añadir al pedido",
+                type="primary",
+                disabled=not ok,
+                use_container_width=True,
+                key=f"mc_ok_{gen}",
+            ):
                 pizza_name = st.session_state.multicereal_item
                 ingredients_text = " + ".join(st.session_state.selected_ingredients)
                 full_item_name = f"{pizza_name} (con {ingredients_text})"
-                
                 st.session_state.order[full_item_name] += 1
-                
-                # Limpiar el modal
                 st.session_state.show_multicereal_modal = False
                 st.session_state.selected_ingredients = []
                 del st.session_state.multicereal_item
-                st.success("🎉 ¡Pizza multicereal agregada al pedido!")
-                
-        with col2:
-            if st.button("🗑️ Limpiar", use_container_width=True):
+                st.success("Pizza multicereal añadida")
+        with a2:
+            if st.button("↺ Vaciar", use_container_width=True, key=f"mc_clr_{gen}"):
                 st.session_state.selected_ingredients = []
-                
-        with col3:
-            if st.button("❌ Cancelar", use_container_width=True):
-                # Limpiar el modal sin agregar nada
+        with a3:
+            if st.button("Cancelar", use_container_width=True, key=f"mc_x_{gen}"):
                 st.session_state.show_multicereal_modal = False
                 st.session_state.selected_ingredients = []
-                if 'multicereal_item' in st.session_state:
+                if "multicereal_item" in st.session_state:
                     del st.session_state.multicereal_item
 
+
 def show_4estaciones_modal():
-    """Muestra el modal para seleccionar ingredientes de la pizza 4 Estaciones."""
-    if not st.session_state.get('show_4estaciones_modal', False):
+    """4 Estaciones: botones tipo toggle (sin checkboxes; una sola fuente de verdad)."""
+    if not st.session_state.get("show_4estaciones_modal", False):
         return
-    
-    # Crear el modal con estilo destacado
-    st.markdown("""
-    <div style="
-        background-color: #fff8dc;
-        border: 2px solid #ff6b35;
-        border-radius: 10px;
-        padding: 20px;
-        margin: 10px 0;
-    ">
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.container():
-        st.subheader(f"🍕 Selecciona 4 ingredientes para tu {st.session_state.estaciones_item}")
-        st.info("💡 Los ingredientes están incluidos en el precio de la pizza 4 Estaciones")
-        
-        selected_count = len(st.session_state.get('selected_estaciones_ingredients', []))
-        
-        # Mostrar progreso
-        progress_text = f"Ingredientes seleccionados: {selected_count}/4"
-        st.progress(min(selected_count / 4.0, 1.0))
-        if selected_count == 0:
-            st.warning(f"⚠️ {progress_text}")
-        elif selected_count < 4:
-            remaining = 4 - selected_count
-            st.info(f"ℹ️ {progress_text} (faltan {remaining})")
-        else:
-            st.success(f"✅ {progress_text}")
-        
-        cols = st.columns(2)
-        
-        for i, ingredient in enumerate(ESTACIONES_INGREDIENTS):
-            with cols[i % 2]:
-                is_selected = ingredient in st.session_state.get('selected_estaciones_ingredients', [])
-                
-                # Deshabilitar si ya se seleccionaron 4 y este no está seleccionado
-                disabled = selected_count >= 4 and not is_selected
-                
-                # Crear checkbox con emoji
-                emoji_map = {
-                    "Jamón": "🍖", "Queso Extra": "🧀", "Maíz": "🌽", "Piña": "🍍",
-                    "Cebolla": "🧅", "Pimentón": "🫑", "Tomate en Ruedas": "🍅", "Salami": "🥩",
-                    "Aceitunas Negras": "🫒", "Tocineta": "🥓", "Pepperoni": "🍕", "Champiñones": "🍄",
-                    "Tomate Seco": "🍅", "Anchoas": "🐟", "Aceitunas Verdes": "🫒", "Pesto Genovés": "🌿", "Pesto Rosso": "🌶️", "Rúcula": "🥬"
-                }
-                
-                ingredient_display = f"{emoji_map.get(ingredient, '🔸')} {ingredient}"
-                
-                if st.checkbox(
-                    ingredient_display, 
-                    value=is_selected, 
-                    key=f"estaciones_ingredient_{ingredient}",
-                    disabled=disabled
+
+    gen = int(st.session_state.get("estaciones_modal_generation", 0))
+    pizza_raw = st.session_state.get("estaciones_item", "4 Estaciones")
+    pizza_short = pizza_raw.split(" (")[0] if " (" in pizza_raw else pizza_raw
+    sel = st.session_state.get("selected_estaciones_ingredients", [])
+    n = len(sel)
+
+    with st.container(border=True):
+        st.markdown(
+            f'<p class="cp-modal-kicker">4 Estaciones</p><h3 class="cp-modal-title">Elige 4 ingredientes</h3>',
+            unsafe_allow_html=True,
+        )
+        st.caption(f"Pizza: {pizza_short} · Uno por estación · Incluidos en el precio")
+        m1, m2 = st.columns(2)
+        with m1:
+            st.metric("Selección", f"{n} / 4", delta="Listo" if n == 4 else None)
+        with m2:
+            st.progress(min(n / 4.0, 1.0))
+
+        grid = st.columns(2)
+        for idx, ingredient in enumerate(ESTACIONES_INGREDIENTS):
+            with grid[idx % 2]:
+                em = INGREDIENT_EMOJI.get(ingredient, "🔸")
+                on = ingredient in sel
+                label = f"✓ {em} {ingredient}" if on else f"{em} {ingredient}"
+                disabled = n >= 4 and not on
+                if st.button(
+                    label,
+                    key=f"es_{gen}_{idx}",
+                    use_container_width=True,
+                    type="primary" if on else "secondary",
+                    disabled=disabled,
                 ):
-                    if ingredient not in st.session_state.selected_estaciones_ingredients:
-                        if len(st.session_state.selected_estaciones_ingredients) < 4:
-                            st.session_state.selected_estaciones_ingredients.append(ingredient)
-                else:
-                    if ingredient in st.session_state.selected_estaciones_ingredients:
-                        st.session_state.selected_estaciones_ingredients.remove(ingredient)
-        
-        # Mostrar ingredientes seleccionados
-        if st.session_state.selected_estaciones_ingredients:
-            ingredients_with_emojis = []
-            emoji_map = {
-                "Jamón": "🍖", "Queso Extra": "🧀", "Maíz": "🌽", "Piña": "🍍",
-                "Cebolla": "🧅", "Pimentón": "🫑", "Tomate en Ruedas": "🍅", "Salami": "🥩",
-                "Aceitunas Negras": "🫒", "Tocineta": "🥓", "Pepperoni": "🍕", "Champiñones": "🍄",
-                "Tomate Seco": "🍅", "Anchoas": "🐟", "Aceitunas Verdes": "🫒", "Pesto Genovés": "🌿", "Pesto Rosso": "🌶️", "Rúcula": "🥬"
-            }
-            
-            for ing in st.session_state.selected_estaciones_ingredients:
-                ingredients_with_emojis.append(f"{emoji_map.get(ing, '🔸')} {ing}")
-            
-            st.markdown(f"**Tus 4 estaciones:** {' + '.join(ingredients_with_emojis)}")
-        
-        st.markdown("---")
-        
-        # Botones de acción
-        col1, col2, col3 = st.columns([1, 1, 1])
-        
-        with col1:
-            confirm_disabled = len(st.session_state.selected_estaciones_ingredients) != 4
-            if st.button("✅ Confirmar Pizza", disabled=confirm_disabled, use_container_width=True, key="confirm_4estaciones"):
-                # Agregar la pizza con ingredientes al pedido
+                    toggle_estaciones_ingredient(ingredient)
+
+        if sel:
+            st.caption("Elegidos: " + " · ".join(f"{INGREDIENT_EMOJI.get(x, '•')} {x}" for x in sel))
+
+        a1, a2, a3 = st.columns(3)
+        with a1:
+            ok = n == 4
+            if st.button(
+                "✅ Añadir al pedido",
+                type="primary",
+                disabled=not ok,
+                use_container_width=True,
+                key=f"es_ok_{gen}",
+            ):
                 pizza_name = st.session_state.estaciones_item
                 ingredients_text = " + ".join(st.session_state.selected_estaciones_ingredients)
                 full_item_name = f"{pizza_name} (con {ingredients_text})"
-                
                 st.session_state.order[full_item_name] += 1
-                
-                # Limpiar el modal
                 st.session_state.show_4estaciones_modal = False
                 st.session_state.selected_estaciones_ingredients = []
                 del st.session_state.estaciones_item
-                st.success("🎉 ¡Pizza 4 Estaciones agregada al pedido!")
-                
-        with col2:
-            if st.button("🗑️ Limpiar", use_container_width=True, key="clear_4estaciones"):
+                st.success("Pizza 4 Estaciones añadida")
+        with a2:
+            if st.button("↺ Vaciar", use_container_width=True, key=f"es_clr_{gen}"):
                 st.session_state.selected_estaciones_ingredients = []
-                
-        with col3:
-            if st.button("❌ Cancelar", use_container_width=True, key="cancel_4estaciones"):
-                # Limpiar el modal sin agregar nada
+        with a3:
+            if st.button("Cancelar", use_container_width=True, key=f"es_x_{gen}"):
                 st.session_state.show_4estaciones_modal = False
                 st.session_state.selected_estaciones_ingredients = []
-                if 'estaciones_item' in st.session_state:
+                if "estaciones_item" in st.session_state:
                     del st.session_state.estaciones_item
 
 
@@ -696,7 +637,9 @@ def add_to_order(item_name):
     if "multicereal" in item_name.lower() and "(con " not in item_name:
         st.session_state.pending_pizza = None
         st.session_state.pending_extra_counts = {}
-        # Activar el modal para seleccionar ingredientes
+        st.session_state.multicereal_modal_generation = int(
+            st.session_state.get("multicereal_modal_generation", 0)
+        ) + 1
         st.session_state.show_multicereal_modal = True
         st.session_state.multicereal_item = item_name
         st.session_state.selected_ingredients = []
@@ -704,7 +647,9 @@ def add_to_order(item_name):
     elif "4 estaciones" in item_name.lower() and "(con " not in item_name:
         st.session_state.pending_pizza = None
         st.session_state.pending_extra_counts = {}
-        # Activar el modal para seleccionar ingredientes
+        st.session_state.estaciones_modal_generation = int(
+            st.session_state.get("estaciones_modal_generation", 0)
+        ) + 1
         st.session_state.show_4estaciones_modal = True
         st.session_state.estaciones_item = item_name
         st.session_state.selected_estaciones_ingredients = []
@@ -763,6 +708,9 @@ def _apply_pizza_size_choice(size_label):
     st.session_state.pending_pizza_category = None
     if "4 estaciones" in base.lower():
         st.session_state.estaciones_item = full
+        st.session_state.estaciones_modal_generation = int(
+            st.session_state.get("estaciones_modal_generation", 0)
+        ) + 1
         st.session_state.show_4estaciones_modal = True
         st.session_state.selected_estaciones_ingredients = []
         return
@@ -774,10 +722,15 @@ def confirm_pending_pizza():
     p = st.session_state.pending_pizza
     if not p:
         return
+    extras_copy = {
+        k: int(v)
+        for k, v in st.session_state.pending_extra_counts.items()
+        if v and int(v) > 0
+    }
     st.session_state.order[p] += 1
-    for k, v in st.session_state.pending_extra_counts.items():
-        if v and v > 0:
-            st.session_state.order[k] += v
+    for k, v in extras_copy.items():
+        st.session_state.order[k] += v
+    st.session_state.order_bundles.append({"pizza": p, "extras": extras_copy})
     cancel_pending_pizza()
 
 
@@ -1067,30 +1020,61 @@ def format_order_text():
     sorted_order = sorted(st.session_state.order.items())
 
     for item, quantity in sorted_order:
-        # Manejar delivery de forma especial
         if item == "🚚 Delivery":
-            price_usd = quantity  # Para delivery, quantity es el precio
-            total_item_price_usd = price_usd
-            total_item_price_bs = total_item_price_usd * st.session_state.dollar_rate
-            subtotal_usd += total_item_price_usd
-            
-            line = f"🚚 Delivery"
-            price_str = f"${total_item_price_usd:.2f} (Bs. {total_item_price_bs:,.2f})"
-            formatted_line = f"{line.ljust(45, '.')} {price_str.rjust(20)}"
-            order_lines.append(formatted_line)
+            price_usd = quantity
+            subtotal_usd += price_usd
         else:
-            price_usd = get_item_price(item)  # Usar la nueva función
-            total_item_price_usd = price_usd * quantity
-            total_item_price_bs = total_item_price_usd * st.session_state.dollar_rate
-            subtotal_usd += total_item_price_usd
-            
-            # Agregar emoji al texto del pedido
-            size_emoji = get_size_emoji(item)
-            item_with_emoji = f"{size_emoji} {item}" if size_emoji else item
-            line = f"{quantity}x {item_with_emoji}"
-            price_str = f"${total_item_price_usd:.2f} (Bs. {total_item_price_bs:,.2f})"
-            formatted_line = f"{line.ljust(45, '.')} {price_str.rjust(20)}"
-            order_lines.append(formatted_line)
+            price_usd = get_item_price(item)
+            subtotal_usd += price_usd * quantity
+
+    def _fmt_line(label_left: str, price_usd_line: float):
+        bs = price_usd_line * st.session_state.dollar_rate
+        price_str = f"${price_usd_line:.2f} (Bs. {bs:,.2f})"
+        left = label_left[:48] if len(label_left) > 48 else label_left
+        order_lines.append(f"{left.ljust(48)} {price_str.rjust(18)}")
+
+    remaining = Counter(st.session_state.order)
+    bundles = list(st.session_state.get("order_bundles") or [])
+
+    for b in bundles:
+        pz = b.get("pizza")
+        ext = b.get("extras") or {}
+        if not pz or remaining.get(pz, 0) < 1:
+            continue
+        if not all(remaining.get(ek, 0) >= ev for ek, ev in ext.items()):
+            continue
+        remaining[pz] -= 1
+        pu = get_item_price(pz)
+        size_emoji = get_size_emoji(pz)
+        lab = f"1x {size_emoji} {pz}" if size_emoji else f"1x {pz}"
+        _fmt_line(lab, pu)
+        for ek, ev in sorted(ext.items()):
+            if ev <= 0:
+                continue
+            remaining[ek] -= ev
+            short = short_ingredient_menu_label(ek)
+            eu = get_item_price(ek)
+            _fmt_line(f"   └ + {short} ×{ev}", eu * ev)
+
+    for item, quantity in sorted(remaining.items()):
+        if quantity <= 0:
+            continue
+        if item == "🚚 Delivery":
+            price_usd = quantity
+            total_item_price_usd = price_usd
+            line = "🚚 Delivery"
+            bs = total_item_price_usd * st.session_state.dollar_rate
+            price_str = f"${total_item_price_usd:.2f} (Bs. {bs:,.2f})"
+            order_lines.append(f"{line.ljust(45, '.')} {price_str.rjust(20)}")
+            continue
+        price_usd = get_item_price(item)
+        total_item_price_usd = price_usd * quantity
+        total_item_price_bs = total_item_price_usd * st.session_state.dollar_rate
+        size_emoji = get_size_emoji(item)
+        item_with_emoji = f"{size_emoji} {item}" if size_emoji else item
+        line = f"{quantity}x {item_with_emoji}"
+        price_str = f"${total_item_price_usd:.2f} (Bs. {total_item_price_bs:,.2f})"
+        order_lines.append(f"{line.ljust(45, '.')} {price_str.rjust(20)}")
     
     subtotal_bs = subtotal_usd * st.session_state.dollar_rate
     order_lines.append("")
@@ -1111,6 +1095,46 @@ def format_order_text():
     order_lines.append("=" * 50)
     
     return "\n".join(order_lines), subtotal_usd
+
+
+def render_clipboard_copy_button(text: str, dom_id: str):
+    """Botón que copia el texto al portapapeles (sin seleccionar el área)."""
+    esc = html.escape(text)
+    safe_id = "".join(c if c.isalnum() else "_" for c in dom_id)
+    st.components.v1.html(
+        f"""
+<div style="padding:4px 0 10px 0;font-family:system-ui,sans-serif;">
+  <textarea id="clip_{safe_id}" readonly tabindex="-1"
+    style="position:absolute;left:-2500px;top:0;width:3px;height:3px;opacity:0;border:none;">{esc}</textarea>
+  <button type="button" id="bt_{safe_id}"
+    style="width:100%;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,#c92a2a 0%,#7a1818 100%);color:#fff;border:none;font-weight:600;font-size:0.9rem;cursor:pointer;">
+    📋 Copiar al portapapeles (WhatsApp)
+  </button>
+</div>
+<script>
+(function() {{
+  var ta = document.getElementById('clip_{safe_id}');
+  var btn = document.getElementById('bt_{safe_id}');
+  if (!ta || !btn) return;
+  btn.addEventListener('click', function() {{
+    var txt = ta.value;
+    if (navigator.clipboard && navigator.clipboard.writeText) {{
+      navigator.clipboard.writeText(txt).then(function() {{
+        btn.textContent = '✓ Copiado';
+        setTimeout(function() {{ btn.textContent = '📋 Copiar al portapapeles (WhatsApp)'; }}, 2200);
+      }}).catch(function() {{
+        try {{ ta.select(); document.execCommand('copy'); btn.textContent = '✓ Copiado'; }} catch(e) {{ btn.textContent = 'No se pudo copiar'; }}
+      }});
+    }} else {{
+      try {{ ta.select(); document.execCommand('copy'); btn.textContent = '✓ Copiado'; }} catch(e) {{ btn.textContent = 'No se pudo copiar'; }}
+    }}
+  }});
+}})();
+</script>
+""",
+        height=118,
+    )
+
 
 # --- FUNCIONES DE IMPRESIÓN 58MM ---
 
@@ -1844,6 +1868,11 @@ CASTELL_CSS = """
         border: 1px solid #ddd !important;
         padding: 10px 14px !important;
     }
+    .cp-modal-kicker {
+        font-size: 0.68rem !important; font-weight: 700 !important; color: var(--castell-red) !important;
+        text-transform: uppercase !important; letter-spacing: 0.08em !important; margin: 0 0 2px 0 !important;
+    }
+    .cp-modal-title { font-size: 1.05rem !important; margin: 0 0 6px 0 !important; color: #1a1a1a !important; }
     .stMetric { background: transparent !important; }
     .cp-pedido-nombre {
         font-size: 0.8rem !important; line-height: 1.2 !important; margin: 0 !important; padding: 0 !important;
@@ -2127,6 +2156,7 @@ elif nk == "pedido":
 
     order_text, _ = format_order_text()
     st.markdown("##### Copiar para WhatsApp")
+    render_clipboard_copy_button(order_text, "wa_pedido")
     # Sincronizar siempre: con key=, Streamlit ignora value= y conserva texto viejo en session_state
     st.session_state["wa_text_pedido"] = order_text
     st.text_area("Pedido", height=220, key="wa_text_pedido", label_visibility="collapsed")
@@ -2136,6 +2166,7 @@ elif nk == "pedido":
 
     if st.button("🗑️ Reiniciar pedido", use_container_width=True, key="reset_pedido"):
         st.session_state.order.clear()
+        st.session_state.order_bundles = []
         st.session_state.customer_name = ""
         st.session_state.order_type = "Para comer aquí"
         st.session_state.chef_notes = ""
@@ -2165,6 +2196,8 @@ else:
             st.metric("Total a pagar", f"Bs. {sbs:,.2f}")
 
     ot, _ = format_order_text()
+    st.markdown("##### Copiar rápido")
+    render_clipboard_copy_button(ot, "wa_resumen")
     st.session_state["wa_text_resumen"] = ot
     st.text_area("Texto WhatsApp", height=180, key="wa_text_resumen", label_visibility="collapsed")
 
@@ -2173,6 +2206,7 @@ else:
 
     if st.button("🗑️ Reiniciar pedido", use_container_width=True, key="reset_resumen"):
         st.session_state.order.clear()
+        st.session_state.order_bundles = []
         st.session_state.customer_name = ""
         st.session_state.order_type = "Para comer aquí"
         st.session_state.chef_notes = ""
