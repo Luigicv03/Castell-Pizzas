@@ -1027,8 +1027,8 @@ def format_order_text():
     subtotal_bs = subtotal_usd * st.session_state.dollar_rate
     order_lines.append("")
     order_lines.append("-" * 50)
-    subtotal_line = f"{'SUBTOTAL'.ljust(25)} ${subtotal_usd:.2f} (Bs. {subtotal_bs:,.2f})"
-    order_lines.append(subtotal_line)
+    # Incluye productos + delivery; mismo monto que el subtotal de la pantalla
+    order_lines.append(f"{'TOTAL A PAGAR'.ljust(25)} ${subtotal_usd:.2f} (Bs. {subtotal_bs:,.2f})")
     order_lines.append("")
     order_lines.append(f"Tasa BCV: Bs. {st.session_state.dollar_rate:,.2f} por USD")
     order_lines.append("")
@@ -1998,7 +1998,9 @@ elif nk == "pedido":
 
     order_text, _ = format_order_text()
     st.markdown("##### Copiar para WhatsApp")
-    st.text_area("Pedido", value=order_text, height=220, key="wa_text_pedido", label_visibility="collapsed")
+    # Sincronizar siempre: con key=, Streamlit ignora value= y conserva texto viejo en session_state
+    st.session_state["wa_text_pedido"] = order_text
+    st.text_area("Pedido", height=220, key="wa_text_pedido", label_visibility="collapsed")
 
     st.markdown("##### Impresión")
     render_print_ticket_buttons("_pedido")
@@ -2034,7 +2036,8 @@ else:
             st.metric("Total a pagar", f"Bs. {sbs:,.2f}")
 
     ot, _ = format_order_text()
-    st.text_area("Texto WhatsApp", value=ot, height=180, key="wa_text_resumen", label_visibility="collapsed")
+    st.session_state["wa_text_resumen"] = ot
+    st.text_area("Texto WhatsApp", height=180, key="wa_text_resumen", label_visibility="collapsed")
 
     st.markdown("##### Acciones")
     render_print_ticket_buttons("_resumen")
